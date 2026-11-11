@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Times New Roman", Times, serif;
+  --font-serif: "Times New Roman", Times, serif;
+  --color-background: #ffffff;
+  --color-foreground: #000000;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: #ffffff;
+  color: #000000;
+  font-family: "Times New Roman", Times, serif;
+  font-feature-settings: "lnum", "tnum";
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #000000;
+  color: #ffffff;
+}
