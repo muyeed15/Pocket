@@ -146,6 +146,11 @@ export function TransfersView({
 
   const isFiltering =
     Boolean(query.trim()) || accountFilter !== 'ALL' || chargesOnly;
+  const clearFilters = () => {
+    setQuery('');
+    setAccountFilter('ALL');
+    setChargesOnly(false);
+  };
   const emptyMessage = isFiltering
     ? `No matching transfers${scope === 'month' ? ` in ${monthLabel}` : ''}`
     : scope === 'month'
@@ -161,14 +166,7 @@ export function TransfersView({
           </Button>
         )}
         {isFiltering && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setQuery('');
-              setAccountFilter('ALL');
-              setChargesOnly(false);
-            }}
-          >
+          <Button variant="ghost" onClick={clearFilters}>
             Clear filters
           </Button>
         )}
@@ -293,59 +291,18 @@ export function TransfersView({
               className="w-full sm:w-44"
               inputClassName="border-b-0 py-1.5 text-[15px] text-neutral-600"
             />
-          </div>
-        </div>
 
-        {visible.length > 0 && (
-          <div className="flex flex-wrap items-baseline justify-between gap-4 text-sm text-neutral-500">
-            <div className="flex items-baseline gap-4">
-              <span className="tabular-nums">
-                {visible.length}{' '}
-                {visible.length === 1 ? 'transfer' : 'transfers'}
-              </span>
-              {isFiltering && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuery('');
-                    setAccountFilter('ALL');
-                    setChargesOnly(false);
-                  }}
-                  className="text-neutral-400 transition-colors hover:text-black"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-            {selectedAccount ? (
-              <div className="flex flex-wrap gap-x-6 gap-y-1 tabular-nums">
-                {stats.received > 0 && (
-                  <span>+{formatTk(stats.received, { symbol })} in</span>
-                )}
-                {stats.sent + stats.chargedOutFees > 0 && (
-                  <span>
-                    -{formatTk(round2(stats.sent + stats.chargedOutFees), { symbol })}{' '}
-                    out
-                  </span>
-                )}
-                <span className="text-black">
-                  Net {formatTk(stats.accountNet, { showSign: true, symbol })}
-                </span>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-x-6 gap-y-1 tabular-nums">
-                <span className="text-black">
-                  {formatTk(stats.moved, { symbol })} moved
-                </span>
-                {stats.fees > 0 && (
-                  <span>
-                    Service charges -{formatTk(stats.fees, { symbol })}
-                  </span>
-                )}
-              </div>
+            {isFiltering && visible.length > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="whitespace-nowrap text-[14px] text-neutral-400 transition-colors hover:text-black"
+              >
+                Clear filters
+              </button>
             )}
           </div>
-        )}
+        </div>
 
         {days.length === 0 ? (
           <EmptyState>

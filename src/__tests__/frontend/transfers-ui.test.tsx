@@ -112,6 +112,8 @@ describe('Transfers UI', () => {
     assert.ok(screen.getByText('Tk 1,500.00'));
     assert.ok(screen.getByText('Tk 18.50'));
     assert.ok(screen.getByText('Tk 1,518.50'));
+    assert.equal(screen.queryByText(/Tk 1,500\.00 moved/), null);
+    assert.equal(screen.queryByText(/Service charges -Tk/), null);
     assert.ok(screen.getByText('bKash to Cash'));
     assert.ok(screen.getByText('Cash to bKash'));
     assert.equal(screen.queryByText('Bank to bKash'), null);
