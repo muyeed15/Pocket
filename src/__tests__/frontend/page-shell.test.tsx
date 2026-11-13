@@ -60,12 +60,17 @@ describe('PageShell and unified page layouts', () => {
     render(<AccountView user={{ name: 'Muyeed', email: 'muyeed@example.com' }} />);
 
     assert.equal(screen.getByRole('heading', { level: 1 }).textContent, 'Account');
-    assert.ok(screen.getByText('Manage your name, email address, and password.'));
+    assert.ok(screen.getByRole('heading', { level: 2, name: 'Profile' }));
+    assert.ok(screen.getByRole('heading', { level: 2, name: 'Password' }));
     assert.ok(screen.getByRole('link', { name: /Overview/i }));
     assert.ok(screen.getByRole('button', { name: 'User menu' }));
     assert.ok(screen.getByLabelText('Name'));
     assert.ok(screen.getByLabelText('Email'));
     assert.ok(screen.getByLabelText('Current password'));
+    assert.ok(screen.getByLabelText(/^New password/i));
+    assert.ok(screen.getByLabelText('Confirm new password'));
+    assert.ok(screen.getByRole('button', { name: 'Save profile' }));
+    assert.ok(screen.getByRole('button', { name: 'Update password' }));
   });
 
   it('renders AuthForm login and register modes via PageShell', () => {
