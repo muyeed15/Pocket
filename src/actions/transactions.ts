@@ -21,9 +21,7 @@ async function verifyTransactionOwnership(
 ): Promise<string | null> {
   const [catOwned, accOwned, sfOwned] = await Promise.all([
     ownsRecord(schema.categories, parsed.categoryId, userId),
-    parsed.accountId
-      ? ownsRecord(schema.accounts, parsed.accountId, userId)
-      : Promise.resolve(true),
+    ownsRecord(schema.accounts, parsed.accountId, userId),
     parsed.savingsFundId
       ? ownsRecord(schema.savingsFunds, parsed.savingsFundId, userId)
       : Promise.resolve(true),
@@ -42,7 +40,8 @@ export async function createTransactionAction(
   const parsed = parseTransactionInput(formData);
   if (!parsed) {
     return {
-      error: 'Please provide a valid date, category, and positive amount.',
+      error:
+        'Please provide a valid date, category, account, and positive amount.',
     };
   }
 
@@ -69,7 +68,8 @@ export async function updateTransactionAction(
   const parsed = parseTransactionInput(formData);
   if (!parsed) {
     return {
-      error: 'Please provide a valid date, category, and positive amount.',
+      error:
+        'Please provide a valid date, category, account, and positive amount.',
     };
   }
 

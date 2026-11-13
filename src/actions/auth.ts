@@ -55,94 +55,99 @@ export async function registerAction(formData: FormData): Promise<ActionResult> 
 
   const passwordHash = hashPassword(password);
 
-  const createdUser = await db.transaction(async (tx) => {
-    const [user] = await tx
-      .insert(schema.users)
-      .values({
-        name,
-        email,
-        passwordHash,
-      })
-      .returning({ id: schema.users.id });
+  let createdUser: { id: string };
+  try {
+    createdUser = await db.transaction(async (tx) => {
+      const [user] = await tx
+        .insert(schema.users)
+        .values({
+          name,
+          email,
+          passwordHash,
+        })
+        .returning({ id: schema.users.id });
 
-    await tx.insert(schema.accounts).values({
-      userId: user.id,
-      name: 'Cash',
-      type: 'CASH',
-      openingBalance: '0.00',
-      sortOrder: 0,
-    });
-
-    const [essentialsGroup, lifestyleGroup] = await tx
-      .insert(schema.budgetGroups)
-      .values([
-        { userId: user.id, name: 'Essentials', sortOrder: 0 },
-        { userId: user.id, name: 'Lifestyle', sortOrder: 1 },
-      ])
-      .returning({ id: schema.budgetGroups.id });
-
-    const [emergencyFund] = await tx
-      .insert(schema.savingsFunds)
-      .values({
+      await tx.insert(schema.accounts).values({
         userId: user.id,
-        name: 'Emergency Fund',
+        name: 'Cash',
+        type: 'CASH',
         openingBalance: '0.00',
         sortOrder: 0,
-      })
-      .returning({ id: schema.savingsFunds.id });
+      });
 
-    await tx.insert(schema.categories).values([
-      {
-        userId: user.id,
-        name: 'Salary',
-        flowType: 'INCOME',
-      },
-      {
-        userId: user.id,
-        name: 'Food and drinks',
-        flowType: 'EXPENSE',
-        budgetGroupId: essentialsGroup.id,
-      },
-      {
-        userId: user.id,
-        name: 'Transport',
-        flowType: 'EXPENSE',
-        budgetGroupId: essentialsGroup.id,
-      },
-      {
-        userId: user.id,
-        name: 'Rickshaw',
-        flowType: 'EXPENSE',
-        budgetGroupId: essentialsGroup.id,
-      },
-      {
-        userId: user.id,
-        name: 'Auto Rickshaw',
-        flowType: 'EXPENSE',
-        budgetGroupId: essentialsGroup.id,
-      },
-      {
-        userId: user.id,
-        name: 'CNG / Baby Taxi',
-        flowType: 'EXPENSE',
-        budgetGroupId: essentialsGroup.id,
-      },
-      {
-        userId: user.id,
-        name: 'Shopping',
-        flowType: 'EXPENSE',
-        budgetGroupId: lifestyleGroup.id,
-      },
-      {
-        userId: user.id,
-        name: 'Savings',
-        flowType: 'SAVINGS_DEPOSIT',
-        defaultSavingsFundId: emergencyFund.id,
-      },
-    ]);
+      const [essentialsGroup, lifestyleGroup] = await tx
+        .insert(schema.budgetGroups)
+        .values([
+          { userId: user.id, name: 'Essentials', sortOrder: 0 },
+          { userId: user.id, name: 'Lifestyle', sortOrder: 1 },
+        ])
+        .returning({ id: schema.budgetGroups.id });
 
-    return user;
-  });
+      const [emergencyFund] = await tx
+        .insert(schema.savingsFunds)
+        .values({
+          userId: user.id,
+          name: 'Emergency Fund',
+          openingBalance: '0.00',
+          sortOrder: 0,
+        })
+        .returning({ id: schema.savingsFunds.id });
+
+      await tx.insert(schema.categories).values([
+        {
+          userId: user.id,
+          name: 'Salary',
+          flowType: 'INCOME',
+        },
+        {
+          userId: user.id,
+          name: 'Food and drinks',
+          flowType: 'EXPENSE',
+          budgetGroupId: essentialsGroup.id,
+        },
+        {
+          userId: user.id,
+          name: 'Transport',
+          flowType: 'EXPENSE',
+          budgetGroupId: essentialsGroup.id,
+        },
+        {
+          userId: user.id,
+          name: 'Rickshaw',
+          flowType: 'EXPENSE',
+          budgetGroupId: essentialsGroup.id,
+        },
+        {
+          userId: user.id,
+          name: 'Auto Rickshaw',
+          flowType: 'EXPENSE',
+          budgetGroupId: essentialsGroup.id,
+        },
+        {
+          userId: user.id,
+          name: 'CNG / Baby Taxi',
+          flowType: 'EXPENSE',
+          budgetGroupId: essentialsGroup.id,
+        },
+        {
+          userId: user.id,
+          name: 'Shopping',
+          flowType: 'EXPENSE',
+          budgetGroupId: lifestyleGroup.id,
+        },
+        {
+          userId: user.id,
+          name: 'Savings',
+          flowType: 'SAVINGS_DEPOSIT',
+          defaultSavingsFundId: emergencyFund.id,
+        },
+      ]);
+
+      return user;
+    });
+  } catch {
+    return { error: 'An account with this email already exists.' };
+  }
 
   await createSessionCookie(createdUser.id);
   redirect('/');

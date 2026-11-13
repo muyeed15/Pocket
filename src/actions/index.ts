@@ -21,6 +21,10 @@ export {
   updateTransactionAction,
   deleteTransactionAction,
 } from './transactions';
-export { createTransferAction, deleteTransferAction } from './transfers';
+export {
+  createTransferAction,
+  updateTransferAction,
+  deleteTransferAction,
+} from './transfers';
 export { upsertBudgetItemAction, deleteBudgetItemAction } from './budgets';
 export { updateAccountOpeningBalanceAction } from './accounts';

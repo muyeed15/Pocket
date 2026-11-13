@@ -3,10 +3,12 @@
 import { and, eq, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
+import { isUuid, parseStrictNumber } from '@/lib/validation';
 import type { AccountType, FlowType } from '@/types/ledger';
 import {
   ActionResult,
   invalidateLedgerCache,
+  ownsRecord,
   requireCurrentUserId,
 } from './shared';
 
@@ -33,11 +35,11 @@ export async function updatePreferencesAction(
     .trim()
     .toUpperCase();
   const currencySymbol = String(formData.get('currencySymbol') || '').trim();
-  const openingCash = parseFloat(
-    String(formData.get('openingCashBalance') || '0').trim()
+  const openingCash = parseStrictNumber(
+    String(formData.get('openingCashBalance') ?? '').trim() || '0'
   );
-  const openingSavings = parseFloat(
-    String(formData.get('openingSavingsBalance') || '0').trim()
+  const openingSavings = parseStrictNumber(
+    String(formData.get('openingSavingsBalance') ?? '').trim() || '0'
   );
 
   if (currencyCode.length !== 3 || !currencySymbol) {
@@ -74,16 +76,42 @@ function parseCategoryInput(formData: FormData) {
     return null;
   }
 
+  const budgetGroupId = flowType === 'EXPENSE' && budgetGroupIdRaw ? budgetGroupIdRaw : null;
+  const defaultSavingsFundId =
+    (flowType === 'SAVINGS_DEPOSIT' || flowType === 'SAVINGS_WITHDRAWAL') &&
+    defaultSavingsFundIdRaw
+      ? defaultSavingsFundIdRaw
+      : null;
+
+  if ((budgetGroupId && !isUuid(budgetGroupId)) || (defaultSavingsFundId && !isUuid(defaultSavingsFundId))) {
+    return null;
+  }
+
   return {
     name,
     flowType,
-    budgetGroupId: flowType === 'EXPENSE' && budgetGroupIdRaw ? budgetGroupIdRaw : null,
-    defaultSavingsFundId:
-      (flowType === 'SAVINGS_DEPOSIT' || flowType === 'SAVINGS_WITHDRAWAL') &&
-      defaultSavingsFundIdRaw
-        ? defaultSavingsFundIdRaw
-        : null,
+    budgetGroupId,
+    defaultSavingsFundId,
   };
+}
+
+async function verifyCategoryReferences(
+  userId: string,
+  parsed: NonNullable<ReturnType<typeof parseCategoryInput>>
+): Promise<string | null> {
+  if (parsed.budgetGroupId) {
+    const owned = await ownsRecord(schema.budgetGroups, parsed.budgetGroupId, userId);
+    if (!owned) return 'Selected budget group does not exist.';
+  }
+  if (parsed.defaultSavingsFundId) {
+    const owned = await ownsRecord(
+      schema.savingsFunds,
+      parsed.defaultSavingsFundId,
+      userId
+    );
+    if (!owned) return 'Selected savings fund does not exist.';
+  }
+  return null;
 }
 
 export async function createCategoryAction(
@@ -94,6 +122,8 @@ export async function createCategoryAction(
   if (!parsed) {
     return { error: 'Please provide a category name and flow type.' };
   }
+  const refError = await verifyCategoryReferences(userId, parsed);
+  if (refError) return { error: refError };
 
   try {
     await db.insert(schema.categories).values({
@@ -114,19 +144,24 @@ export async function updateCategoryAction(
   const userId = await requireCurrentUserId();
   const id = String(formData.get('id') || '').trim();
   if (!id) return { error: 'Missing category ID.' };
+  if (!isUuid(id)) return { error: 'Category not found.' };
 
   const parsed = parseCategoryInput(formData);
   if (!parsed) {
     return { error: 'Please provide a category name and flow type.' };
   }
+  const refError = await verifyCategoryReferences(userId, parsed);
+  if (refError) return { error: refError };
 
   try {
-    await db
+    const updated = await db
       .update(schema.categories)
       .set(parsed)
       .where(
         and(eq(schema.categories.id, id), eq(schema.categories.userId, userId))
-      );
+      )
+      .returning({ id: schema.categories.id });
+    if (updated.length === 0) return { error: 'Category not found.' };
   } catch {
     return { error: 'A category with this name already exists.' };
   }
@@ -138,6 +173,7 @@ export async function updateCategoryAction(
 export async function deleteCategoryAction(id: string): Promise<ActionResult> {
   const userId = await requireCurrentUserId();
   if (!id) return { error: 'Missing category ID.' };
+  if (!isUuid(id)) return { error: 'Category not found.' };
 
   const [{ count: txCount }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -163,11 +199,13 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult> {
     return { error: 'This category is in use and cannot be deleted.' };
   }
 
-  await db
+  const deleted = await db
     .delete(schema.categories)
     .where(
       and(eq(schema.categories.id, id), eq(schema.categories.userId, userId))
-    );
+    )
+    .returning({ id: schema.categories.id });
+  if (deleted.length === 0) return { error: 'Category not found.' };
 
   invalidateLedgerCache(userId);
   return { ok: true };
@@ -197,14 +235,17 @@ export async function updateBudgetGroupAction(
   const id = String(formData.get('id') || '').trim();
   const name = String(formData.get('name') || '').trim();
   if (!id || !name) return { error: 'Please enter a budget group name.' };
+  if (!isUuid(id)) return { error: 'Budget group not found.' };
 
   try {
-    await db
+    const updated = await db
       .update(schema.budgetGroups)
       .set({ name })
       .where(
         and(eq(schema.budgetGroups.id, id), eq(schema.budgetGroups.userId, userId))
-      );
+      )
+      .returning({ id: schema.budgetGroups.id });
+    if (updated.length === 0) return { error: 'Budget group not found.' };
   } catch {
     return { error: 'A budget group with this name already exists.' };
   }
@@ -216,6 +257,7 @@ export async function updateBudgetGroupAction(
 export async function deleteBudgetGroupAction(id: string): Promise<ActionResult> {
   const userId = await requireCurrentUserId();
   if (!id) return { error: 'Missing budget group ID.' };
+  if (!isUuid(id)) return { error: 'Budget group not found.' };
 
   const [{ count: catCount }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -241,11 +283,13 @@ export async function deleteBudgetGroupAction(id: string): Promise<ActionResult>
     return { error: 'This budget group is in use and cannot be deleted.' };
   }
 
-  await db
+  const deleted = await db
     .delete(schema.budgetGroups)
     .where(
       and(eq(schema.budgetGroups.id, id), eq(schema.budgetGroups.userId, userId))
-    );
+    )
+    .returning({ id: schema.budgetGroups.id });
+  if (deleted.length === 0) return { error: 'Budget group not found.' };
 
   invalidateLedgerCache(userId);
   return { ok: true };
@@ -256,8 +300,8 @@ export async function createSavingsFundAction(
 ): Promise<ActionResult> {
   const userId = await requireCurrentUserId();
   const name = String(formData.get('name') || '').trim();
-  const openingNum = parseFloat(
-    String(formData.get('openingBalance') || '0').trim()
+  const openingNum = parseStrictNumber(
+    String(formData.get('openingBalance') ?? '').trim() || '0'
   );
 
   if (!name || !Number.isFinite(openingNum)) {
@@ -284,16 +328,17 @@ export async function updateSavingsFundAction(
   const userId = await requireCurrentUserId();
   const id = String(formData.get('id') || '').trim();
   const name = String(formData.get('name') || '').trim();
-  const openingNum = parseFloat(
-    String(formData.get('openingBalance') || '0').trim()
+  const openingNum = parseStrictNumber(
+    String(formData.get('openingBalance') ?? '').trim() || '0'
   );
 
   if (!id || !name || !Number.isFinite(openingNum)) {
     return { error: 'Please enter a fund name and valid opening balance.' };
   }
+  if (!isUuid(id)) return { error: 'Savings fund not found.' };
 
   try {
-    await db
+    const updated = await db
       .update(schema.savingsFunds)
       .set({
         name,
@@ -302,7 +347,9 @@ export async function updateSavingsFundAction(
       })
       .where(
         and(eq(schema.savingsFunds.id, id), eq(schema.savingsFunds.userId, userId))
-      );
+      )
+      .returning({ id: schema.savingsFunds.id });
+    if (updated.length === 0) return { error: 'Savings fund not found.' };
   } catch {
     return { error: 'A savings fund with this name already exists.' };
   }
@@ -314,6 +361,7 @@ export async function updateSavingsFundAction(
 export async function deleteSavingsFundAction(id: string): Promise<ActionResult> {
   const userId = await requireCurrentUserId();
   if (!id) return { error: 'Missing savings fund ID.' };
+  if (!isUuid(id)) return { error: 'Savings fund not found.' };
 
   const [{ count: txCount }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -349,11 +397,13 @@ export async function deleteSavingsFundAction(id: string): Promise<ActionResult>
     return { error: 'This savings fund is in use and cannot be deleted.' };
   }
 
-  await db
+  const deleted = await db
     .delete(schema.savingsFunds)
     .where(
       and(eq(schema.savingsFunds.id, id), eq(schema.savingsFunds.userId, userId))
-    );
+    )
+    .returning({ id: schema.savingsFunds.id });
+  if (deleted.length === 0) return { error: 'Savings fund not found.' };
 
   invalidateLedgerCache(userId);
   return { ok: true };
@@ -365,8 +415,8 @@ export async function createAccountAction(
   const userId = await requireCurrentUserId();
   const name = String(formData.get('name') || '').trim();
   const type = String(formData.get('type') || '').trim() as AccountType;
-  const openingNum = parseFloat(
-    String(formData.get('openingBalance') || '0').trim()
+  const openingNum = parseStrictNumber(
+    String(formData.get('openingBalance') ?? '').trim() || '0'
   );
 
   if (!name || !VALID_ACCOUNT_TYPES.includes(type) || !Number.isFinite(openingNum)) {
@@ -395,16 +445,17 @@ export async function updateAccountAction(
   const id = String(formData.get('id') || '').trim();
   const name = String(formData.get('name') || '').trim();
   const type = String(formData.get('type') || '').trim() as AccountType;
-  const openingNum = parseFloat(
-    String(formData.get('openingBalance') || '0').trim()
+  const openingNum = parseStrictNumber(
+    String(formData.get('openingBalance') ?? '').trim() || '0'
   );
 
   if (!id || !name || !VALID_ACCOUNT_TYPES.includes(type) || !Number.isFinite(openingNum)) {
     return { error: 'Please provide an account name, type, and opening balance.' };
   }
+  if (!isUuid(id)) return { error: 'Account not found.' };
 
   try {
-    await db
+    const updated = await db
       .update(schema.accounts)
       .set({
         name,
@@ -412,7 +463,9 @@ export async function updateAccountAction(
         openingBalance: openingNum.toFixed(2),
         updatedAt: new Date(),
       })
-      .where(and(eq(schema.accounts.id, id), eq(schema.accounts.userId, userId)));
+      .where(and(eq(schema.accounts.id, id), eq(schema.accounts.userId, userId)))
+      .returning({ id: schema.accounts.id });
+    if (updated.length === 0) return { error: 'Account not found.' };
   } catch {
     return { error: 'An account with this name already exists.' };
   }
@@ -424,6 +477,7 @@ export async function updateAccountAction(
 export async function deleteAccountAction(id: string): Promise<ActionResult> {
   const userId = await requireCurrentUserId();
   if (!id) return { error: 'Missing account ID.' };
+  if (!isUuid(id)) return { error: 'Account not found.' };
 
   const [{ count: txCount }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -449,9 +503,11 @@ export async function deleteAccountAction(id: string): Promise<ActionResult> {
     return { error: 'This account is in use and cannot be deleted.' };
   }
 
-  await db
+  const deleted = await db
     .delete(schema.accounts)
-    .where(and(eq(schema.accounts.id, id), eq(schema.accounts.userId, userId)));
+    .where(and(eq(schema.accounts.id, id), eq(schema.accounts.userId, userId)))
+    .returning({ id: schema.accounts.id });
+  if (deleted.length === 0) return { error: 'Account not found.' };
 
   invalidateLedgerCache(userId);
   return { ok: true };

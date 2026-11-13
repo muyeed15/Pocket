@@ -3,7 +3,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
-import { isUuid } from '@/lib/validation';
+import { isUuid, parseStrictNumber } from '@/lib/validation';
 import {
   ActionResult,
   invalidateLedgerCache,
@@ -16,7 +16,7 @@ export async function updateAccountOpeningBalanceAction(
   const userId = await requireCurrentUserId();
   const accountId = String(formData.get('accountId') || '').trim();
   const openingBalanceRaw = String(formData.get('openingBalance') || '0').trim();
-  const openingNum = parseFloat(openingBalanceRaw);
+  const openingNum = parseStrictNumber(openingBalanceRaw || '0');
 
   if (!accountId || !Number.isFinite(openingNum)) {
     return { error: 'Invalid account or opening balance.' };
