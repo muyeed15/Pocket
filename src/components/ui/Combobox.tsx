@@ -2,6 +2,10 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { IoCheckmark, IoChevronDown, IoClose } from 'react-icons/io5';
+import {
+  cancelScheduledFrame,
+  scheduleFrame,
+} from '@/hooks/useVisualViewportKeyboard';
 import { fieldClass } from './Field';
 
 export interface ComboboxOption {
@@ -53,6 +57,8 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [openUpward, setOpenUpward] = useState(false);
+  const [maxListHeight, setMaxListHeight] = useState(240);
 
   const displayValue = query ?? selectedOption?.label ?? '';
   const showClear = allowClear && Boolean(value) && !disabled;
@@ -83,6 +89,40 @@ export function Combobox({
     return () => window.removeEventListener('pointerdown', handlePointerDown);
   }, [open]);
 
+  // Flip upward and constrain listbox height when space below is cramped (e.g. mobile keyboard)
+  useEffect(() => {
+    if (!open) return;
+
+    function updatePosition() {
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const vv = window.visualViewport;
+      const vpTop = vv ? vv.offsetTop : 0;
+      const vpBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      const spaceBelow = vpBottom - rect.bottom - 12;
+      const spaceAbove = rect.top - vpTop - 12;
+      const shouldOpenUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+      const available = shouldOpenUp ? spaceAbove : spaceBelow;
+      setOpenUpward(shouldOpenUp);
+      setMaxListHeight(available > 48 ? Math.min(240, Math.floor(available)) : 180);
+    }
+
+    const frameId = scheduleFrame(updatePosition);
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', updatePosition);
+    vv?.addEventListener('scroll', updatePosition);
+    window.addEventListener('scroll', updatePosition, { capture: true, passive: true });
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      cancelScheduledFrame(frameId);
+      vv?.removeEventListener('resize', updatePosition);
+      vv?.removeEventListener('scroll', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open]);
+
   // Keep keyboard-highlighted option visible inside scrollable list
   useEffect(() => {
     if (!open || !listboxRef.current) return;
@@ -105,6 +145,12 @@ export function Combobox({
     );
   }, [options, displayValue, selectedOption]);
 
+  function getInitialActiveIndex() {
+    if (!value) return 0;
+    const idx = options.findIndex((o) => o.value === value);
+    return idx >= 0 ? idx : 0;
+  }
+
   function selectOption(option: ComboboxOption) {
     onChange(option.value);
     setQuery(null);
@@ -116,7 +162,7 @@ export function Combobox({
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         setOpen(true);
-        setActiveIndex(0);
+        setActiveIndex(getInitialActiveIndex());
       }
       return;
     }
@@ -173,7 +219,7 @@ export function Combobox({
           placeholder={placeholder}
           onFocus={(e) => {
             setOpen(true);
-            setActiveIndex(0);
+            setActiveIndex(getInitialActiveIndex());
             if (selectedOption) {
               justFocusedRef.current = true;
               e.currentTarget.select();
@@ -188,7 +234,7 @@ export function Combobox({
           onClick={() => {
             if (!disabled && !open) {
               setOpen(true);
-              setActiveIndex(0);
+              setActiveIndex(getInitialActiveIndex());
             }
           }}
           onChange={(e) => {
@@ -211,7 +257,7 @@ export function Combobox({
             onMouseDown={(e) => {
               e.preventDefault();
               onChange('');
-              setQuery('');
+              setQuery(null);
               inputRef.current?.focus();
             }}
             className="absolute right-6 inline-flex size-6 items-center justify-center text-neutral-400 transition-colors hover:text-black"
@@ -232,6 +278,7 @@ export function Combobox({
             } else {
               inputRef.current?.focus();
               setOpen(true);
+              setActiveIndex(getInitialActiveIndex());
             }
           }}
           className="absolute right-0 inline-flex size-6 items-center justify-center text-neutral-400 transition-colors hover:text-black"
@@ -247,7 +294,10 @@ export function Combobox({
           ref={listboxRef}
           id={listboxId}
           role="listbox"
-          className="absolute left-0 right-0 z-50 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
+          style={{ maxHeight: `${maxListHeight}px` }}
+          className={`absolute left-0 right-0 z-50 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.08)] ${
+            openUpward ? 'bottom-full mb-2' : 'top-full mt-2'
+          }`}
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2.5 text-sm text-neutral-400">

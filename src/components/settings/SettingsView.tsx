@@ -166,7 +166,7 @@ export function SettingsView({ data }: { data: SettingsSnapshot }) {
                   }
                   allowClear={categoryFlow !== 'ALL'}
                   placeholder="All types"
-                  className="w-44"
+                  className="w-full sm:w-44"
                   inputClassName="border-b-0 py-1.5 text-[15px] text-neutral-600"
                 />
               </div>
@@ -503,6 +503,7 @@ export function SettingsView({ data }: { data: SettingsSnapshot }) {
                       type="text"
                       name="currencyCode"
                       required
+                      minLength={3}
                       maxLength={3}
                       defaultValue={data.user.currencyCode}
                       className={`${fieldClass} uppercase`}

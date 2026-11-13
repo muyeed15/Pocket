@@ -26,7 +26,7 @@ export function SubpageHeader({ userName, userEmail }: SubpageHeaderProps) {
           className="inline-flex items-center gap-1.5 text-[15px] text-neutral-500 transition-colors hover:text-black"
         >
           <IoArrowBack className="text-sm" />
-          Ledger
+          Overview
         </Link>
       </div>
 

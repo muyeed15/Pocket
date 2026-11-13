@@ -2,9 +2,10 @@
 
 import React, { useMemo, useState } from 'react';
 import { ACCOUNT_TYPE_LABELS, FLOW_TYPE_LABELS } from '@/lib/constants';
-import { todayLocalIso } from '@/lib/format';
+import { formatTk, todayLocalIso } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
+import { useCurrencySymbol } from '@/components/ui/CurrencyContext';
 import { Field, fieldClass, MoneyInput } from '@/components/ui/Field';
 import type {
   AccountBalanceRow,
@@ -18,6 +19,7 @@ interface TransactionFormProps {
   accounts: AccountBalanceRow[];
   savingsFunds: SavingsFundBalanceRow[];
   initialTransaction?: LedgerTransactionRow | null;
+  defaultDate?: string;
   isPending: boolean;
   onSubmit: (formData: FormData) => void;
 }
@@ -27,18 +29,41 @@ export function TransactionForm({
   accounts,
   savingsFunds,
   initialTransaction,
+  defaultDate,
   isPending,
   onSubmit,
 }: TransactionFormProps) {
+  const symbol = useCurrencySymbol();
   const [categoryId, setCategoryId] = useState(
     initialTransaction?.categoryId ?? ''
   );
   const [accountId, setAccountId] = useState(
-    initialTransaction?.accountId ?? ''
+    initialTransaction
+      ? (initialTransaction.accountId ?? '')
+      : accounts.length === 1
+        ? accounts[0].accountId
+        : ''
   );
   const [savingsFundId, setSavingsFundId] = useState(
     initialTransaction?.savingsFundId ?? ''
   );
+
+  function handleCategoryChange(nextCategoryId: string) {
+    setCategoryId(nextCategoryId);
+    const nextCat = categories.find((c) => c.id === nextCategoryId);
+    if (
+      nextCat &&
+      (nextCat.flowType === 'SAVINGS_DEPOSIT' ||
+        nextCat.flowType === 'SAVINGS_WITHDRAWAL')
+    ) {
+      setSavingsFundId(
+        nextCat.defaultSavingsFundId ??
+          (savingsFunds.length === 1 ? savingsFunds[0].savingsFundId : '')
+      );
+    } else {
+      setSavingsFundId('');
+    }
+  }
   const categoryOptions: ComboboxOption[] = useMemo(
     () =>
       categories.map((c) => ({
@@ -70,6 +95,10 @@ export function TransactionForm({
   const category = useMemo(
     () => categories.find((c) => c.id === categoryId),
     [categories, categoryId]
+  );
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.accountId === accountId),
+    [accounts, accountId]
   );
   const isSavingsFlow =
     category?.flowType === 'SAVINGS_DEPOSIT' || category?.flowType === 'SAVINGS_WITHDRAWAL';
@@ -111,19 +140,29 @@ export function TransactionForm({
           required
           options={categoryOptions}
           value={categoryId}
-          onChange={setCategoryId}
+          onChange={handleCategoryChange}
           placeholder="Select or type to search"
         />
       </Field>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1.35fr_1fr]">
-        <Field label="Account">
+        <Field
+          label="Account"
+          hint={
+            selectedAccount
+              ? `Available ${formatTk(selectedAccount.currentBalance, { symbol })}`
+              : initialTransaction && !initialTransaction.accountId
+                ? 'Required — assign the account used'
+                : undefined
+          }
+        >
           <Combobox
             name="accountId"
+            required
             options={accountOptions}
             value={accountId}
             onChange={setAccountId}
-            placeholder="Optional (no account)"
+            placeholder="Select account"
           />
         </Field>
         <Field label="Date">
@@ -131,7 +170,9 @@ export function TransactionForm({
             type="date"
             name="transactionDate"
             required
-            defaultValue={initialTransaction?.transactionDate ?? todayLocalIso()}
+            defaultValue={
+              initialTransaction?.transactionDate ?? defaultDate ?? todayLocalIso()
+            }
             className={fieldClass}
           />
         </Field>
@@ -146,6 +187,11 @@ export function TransactionForm({
             value={savingsFundId}
             onChange={setSavingsFundId}
             placeholder="Select savings fund"
+            emptyText={
+              savingsFunds.length === 0
+                ? 'Add a savings fund in Settings'
+                : 'No matching savings funds'
+            }
           />
         </Field>
       )}

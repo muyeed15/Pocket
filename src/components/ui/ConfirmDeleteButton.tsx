@@ -9,7 +9,7 @@ import { IconButton } from './Button';
  * (zero layout shift on hover) and always visible on touch devices.
  */
 export const ROW_ACTIONS_CLASS =
-  'flex shrink-0 items-center gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100';
+  'flex shrink-0 items-center justify-end gap-1 sm:min-w-[92px] sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:focus-within:opacity-100';
 
 /**
  * Two-step inline delete control to prevent accidental single-tap permanent deletion on touch screens.
@@ -59,7 +59,7 @@ export function ConfirmDeleteButton({
           setConfirming(false);
         }
       }}
-      className="inline-flex h-8 shrink-0 items-center rounded-full bg-black px-3 text-xs text-white transition-colors hover:bg-neutral-800 disabled:opacity-40"
+      className="inline-flex h-8 w-[52px] shrink-0 items-center justify-center rounded-full bg-black text-xs text-white transition-colors hover:bg-neutral-800 disabled:opacity-40"
     >
       {confirmText}
     </button>

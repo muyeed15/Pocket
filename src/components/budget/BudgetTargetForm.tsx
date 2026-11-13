@@ -104,7 +104,7 @@ export function BudgetTargetForm({
           min="0"
           required
           defaultValue={initialItem ? initialItem.plannedAmount : ''}
-          autoFocus
+          autoFocus={Boolean(initialItem)}
           placeholder="0.00"
           className="text-3xl"
         />

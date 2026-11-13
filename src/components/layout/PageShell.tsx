@@ -1,6 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
+import {
+  useKeepFocusedFieldVisible,
+  useVisualViewportMetrics,
+} from '@/hooks/useVisualViewportKeyboard';
 import { Toast, type ToastMessage } from '@/components/ui/Toast';
 
 export function StickyHeader({
@@ -41,6 +45,15 @@ export function PageShell({
   onDismissToast,
   children,
 }: PageShellProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const { keyboardInset, viewportHeight } = useVisualViewportMetrics();
+
+  useKeepFocusedFieldVisible(shellRef, {
+    topPadding: header ? 96 : 16,
+    bottomPadding: 24,
+    ignoreInsideDialog: true,
+  });
+
   const titleHeader =
     eyebrow || title || description ? (
       <header className={centered ? 'space-y-2' : 'space-y-1.5'}>
@@ -51,11 +64,22 @@ export function PageShell({
     ) : null;
 
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div
+      ref={shellRef}
+      style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+      className="min-h-screen bg-white text-black"
+    >
       {header}
 
       {centered ? (
-        <main className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6 sm:py-16">
+        <main
+          style={
+            keyboardInset > 0 && viewportHeight > 0
+              ? { minHeight: `${viewportHeight}px` }
+              : undefined
+          }
+          className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6 sm:py-16"
+        >
           <div className="w-full max-w-sm space-y-8 sm:space-y-10">
             {titleHeader}
             {children}
@@ -75,7 +99,11 @@ export function PageShell({
       )}
 
       {toast !== undefined && onDismissToast && (
-        <Toast message={toast} onDismiss={onDismissToast} />
+        <Toast
+          message={toast}
+          bottomOffset={keyboardInset}
+          onDismiss={onDismissToast}
+        />
       )}
     </div>
   );

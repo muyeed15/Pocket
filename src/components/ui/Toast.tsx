@@ -10,9 +10,11 @@ export interface ToastMessage {
 
 export function Toast({
   message,
+  bottomOffset = 0,
   onDismiss,
 }: {
   message: ToastMessage | null;
+  bottomOffset?: number;
   onDismiss: () => void;
 }) {
   useEffect(() => {
@@ -24,16 +26,20 @@ export function Toast({
   if (!message) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-8 z-[60] flex justify-center px-6">
+    <div
+      style={bottomOffset > 0 ? { bottom: `${32 + bottomOffset}px` } : undefined}
+      className="fixed inset-x-0 bottom-8 z-[60] flex justify-center px-6"
+    >
       <div
         role="status"
-        className={`flex items-center gap-4 rounded-full py-2.5 pl-6 pr-2.5 text-[15px] shadow-[0_12px_40px_rgba(0,0,0,0.12)] ${
+        aria-live={message.type === 'error' ? 'assertive' : 'polite'}
+        className={`flex max-w-md items-center gap-4 rounded-full py-2.5 pl-6 pr-2.5 text-[15px] shadow-[0_12px_40px_rgba(0,0,0,0.12)] ${
           message.type === 'error'
             ? 'border border-black bg-white text-black'
             : 'bg-black text-white'
         }`}
       >
-        {message.text}
+        <span className="min-w-0 break-words">{message.text}</span>
         <button
           type="button"
           aria-label="Dismiss"

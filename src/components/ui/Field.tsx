@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { IoSearchOutline } from 'react-icons/io5';
+import { IoClose, IoSearchOutline } from 'react-icons/io5';
 import { useCurrencySymbol } from './CurrencyContext';
 
 export const fieldClass =
@@ -54,7 +54,7 @@ export function Field({
   );
 }
 
-/** Shared search input used across Ledger and Settings filter bars. */
+/** Shared search input used across Ledger, Transfers, and Settings filter bars. */
 export function SearchField({
   value,
   onChange,
@@ -77,8 +77,20 @@ export function SearchField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        className="w-full bg-transparent py-1.5 pl-6 text-[16px] text-black placeholder:text-neutral-400 focus:outline-none"
+        className={`w-full bg-transparent py-1.5 pl-6 ${
+          value ? 'pr-7' : 'pr-0'
+        } text-[16px] text-black placeholder:text-neutral-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden`}
       />
+      {value && (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => onChange('')}
+          className="absolute right-0 inline-flex size-6 items-center justify-center rounded-full text-neutral-400 transition-colors hover:text-black"
+        >
+          <IoClose className="text-sm" />
+        </button>
+      )}
     </label>
   );
 }

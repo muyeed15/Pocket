@@ -9,6 +9,8 @@
 
 html {
   color-scheme: light;
+  scroll-padding-top: 6rem;
+  scroll-padding-bottom: 2rem;
 }
 
 body {

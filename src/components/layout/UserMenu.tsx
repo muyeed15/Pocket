@@ -47,7 +47,7 @@ export function UserMenu({ userName, userEmail, onLogout }: UserMenuProps) {
   const initial = userName.trim().charAt(0).toUpperCase();
 
   return (
-    <div ref={containerRef} className="relative ml-2">
+    <div ref={containerRef} className="relative ml-1 sm:ml-2">
       <button
         type="button"
         aria-label="User menu"

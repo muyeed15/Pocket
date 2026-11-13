@@ -20,6 +20,7 @@ interface TopHeaderProps {
   activeTab: ActiveTab;
   onSelectTab: (tab: ActiveTab) => void;
   onSelectPeriod: (year: number, month: number) => void;
+  addLabel?: string;
   onAdd: () => void;
   onLogout: () => void;
 }
@@ -32,6 +33,7 @@ export function TopHeader({
   activeTab,
   onSelectTab,
   onSelectPeriod,
+  addLabel = 'New entry',
   onAdd,
   onLogout,
 }: TopHeaderProps) {
@@ -41,10 +43,16 @@ export function TopHeader({
   };
 
   return (
-    <StickyHeader className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
-        <span className="text-xl tracking-tight sm:text-2xl">Pocket</span>
+    <StickyHeader className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:gap-x-8">
+        <button
+          type="button"
+          onClick={() => onSelectTab('overview')}
+          className="text-left text-xl tracking-tight text-black transition-opacity hover:opacity-75 sm:text-2xl"
+        >
+          Pocket
+        </button>
 
-        <nav className="order-3 -mx-1 flex w-full gap-5 overflow-x-auto px-1 sm:gap-7 md:order-2 md:w-auto">
+        <nav className="order-3 -mx-1 flex w-full gap-5 overflow-x-auto px-1 [scrollbar-width:none] sm:gap-7 lg:order-2 lg:w-auto [&::-webkit-scrollbar]:hidden">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -62,7 +70,7 @@ export function TopHeader({
           ))}
         </nav>
 
-        <div className="order-2 ml-auto flex items-center gap-0.5 sm:gap-1 md:order-3">
+        <div className="order-2 ml-auto flex items-center gap-0.5 sm:gap-1 lg:order-3">
           <IconButton label="Previous month" onClick={() => shiftMonth(-1)}>
             <IoChevronBack />
           </IconButton>
@@ -77,7 +85,7 @@ export function TopHeader({
           <IconButton label="Next month" onClick={() => shiftMonth(1)}>
             <IoChevronForward />
           </IconButton>
-          <IconButton label="New entry" solid onClick={onAdd} className="ml-1.5 sm:ml-3">
+          <IconButton label={addLabel} solid onClick={onAdd} className="ml-1 sm:ml-3">
             <IoAdd />
           </IconButton>
           <UserMenu

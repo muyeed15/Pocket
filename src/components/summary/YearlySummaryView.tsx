@@ -32,6 +32,7 @@ export function YearlySummaryView({
     borrowed: round2(monthlySummary.reduce((s, m) => s + m.borrowed, 0)),
     debtPaid: round2(monthlySummary.reduce((s, m) => s + m.debtPaid, 0)),
     transfersNet: round2(monthlySummary.reduce((s, m) => s + m.transfersNet, 0)),
+    transferFees: round2(monthlySummary.reduce((s, m) => s + m.transferFees, 0)),
     untrackedNet: round2(monthlySummary.reduce((s, m) => s + m.untrackedNet, 0)),
     saved: round2(monthlySummary.reduce((s, m) => s + m.saved, 0)),
     savingsUsed: round2(monthlySummary.reduce((s, m) => s + m.savingsUsed, 0)),

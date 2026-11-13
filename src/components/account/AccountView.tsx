@@ -83,6 +83,16 @@ export function AccountView({ user }: AccountViewProps) {
                 }}
                 className="space-y-7"
               >
+                <input
+                  type="text"
+                  name="username"
+                  value={user.email}
+                  readOnly
+                  autoComplete="username"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="hidden"
+                />
                 <Field label="Current password">
                   <input
                     type="password"
