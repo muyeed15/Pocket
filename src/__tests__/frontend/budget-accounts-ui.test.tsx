@@ -125,8 +125,9 @@ describe('BudgetView & AccountsView UI', () => {
 
     assert.ok(screen.getAllByText('€ 1,300.00').length >= 1);
     assert.equal(screen.queryByText('Matches ledger entries'), null);
-    assert.ok(screen.getByText(/in € 500.00 · out € 200.00/));
-    assert.ok(screen.getByText('No savings funds configured yet'));
+    assert.equal(screen.queryByText(/started with/i), null);
+    assert.equal(screen.queryByText(/in € 500\.00/), null);
+    assert.ok(screen.getByText('No savings funds yet'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit opening balance' }));
     const balanceInput = screen.getByDisplayValue('1000');

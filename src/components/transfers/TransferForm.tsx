@@ -203,7 +203,7 @@ export function TransferForm({
         <p className="border-l-2 border-black pl-3 text-sm text-neutral-600">
           Add at least two accounts in{' '}
           <Link
-            href="/settings"
+            href="/settings?tab=accounts"
             className="text-black underline underline-offset-4 hover:text-neutral-600"
           >
             Settings

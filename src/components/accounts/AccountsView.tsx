@@ -59,7 +59,7 @@ export function AccountsView({
           detail={
             isReconciled
               ? undefined
-              : `Differs from ledger by ${formatTk(Math.abs(reconciliation.difference), { symbol })}`
+              : `Differs by ${formatTk(Math.abs(reconciliation.difference), { symbol })}`
           }
         />
         <Metric
@@ -83,7 +83,7 @@ export function AccountsView({
                 </Button>
               )}
               <Link
-                href="/settings"
+                href="/settings?tab=accounts"
                 className="rounded-full px-3 py-1.5 text-[15px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
               >
                 Manage
@@ -93,25 +93,23 @@ export function AccountsView({
         >
           {accounts.length === 0 ? (
             <EmptyState>
-              <p>No accounts configured yet</p>
+              <p>No accounts yet</p>
             </EmptyState>
           ) : (
             <ul className="space-y-8">
               {accounts.map((acc) => {
                 const isEditing = editingId === acc.accountId;
+                const typeLabel = ACCOUNT_TYPE_LABELS[acc.accountType];
+                const showTypeSubtitle =
+                  typeLabel.toLowerCase() !== acc.accountName.trim().toLowerCase();
                 return (
                   <li key={acc.accountId} className="group space-y-2.5">
                     <div className="flex items-baseline justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[18px]">{acc.accountName}</p>
-                        <p className="text-sm text-neutral-500">
-                          {ACCOUNT_TYPE_LABELS[acc.accountType]} · started with {formatTk(acc.openingBalance, { symbol })}
-                          {(acc.moneyIn > 0 || acc.moneyOut > 0) && (
-                            <>
-                              {' '}· in {formatTk(acc.moneyIn, { symbol })} · out {formatTk(acc.moneyOut, { symbol })}
-                            </>
-                          )}
-                        </p>
+                        {showTypeSubtitle && (
+                          <p className="text-sm text-neutral-500">{typeLabel}</p>
+                        )}
                       </div>
                       <div className="flex items-center">
                         <span className="whitespace-nowrap text-xl tabular-nums">
@@ -197,18 +195,13 @@ export function AccountsView({
         <Section title="Savings funds">
           {savingsFunds.length === 0 ? (
             <EmptyState>
-              <p>No savings funds configured yet</p>
+              <p>No savings funds yet</p>
             </EmptyState>
           ) : (
             <ul className="divide-y divide-neutral-100">
               {savingsFunds.map((sf) => (
                 <li key={sf.savingsFundId} className="flex items-baseline justify-between gap-4 py-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[18px]">{sf.savingsFundName}</p>
-                    <p className="text-sm text-neutral-500">
-                      Deposited {formatTk(sf.totalDeposits, { symbol })}, withdrawn {formatTk(sf.totalWithdrawals, { symbol })}
-                    </p>
-                  </div>
+                  <p className="min-w-0 flex-1 truncate text-[18px]">{sf.savingsFundName}</p>
                   <span className="shrink-0 whitespace-nowrap text-xl tabular-nums">
                     {formatTk(sf.currentBalance, { symbol })}
                   </span>
