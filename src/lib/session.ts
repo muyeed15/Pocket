@@ -4,7 +4,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from 'node:crypto';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 const COOKIE_NAME = 'pocket_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
@@ -78,13 +78,34 @@ export function verifySessionToken(token: string): { userId: string } | null {
   }
 }
 
+async function shouldUseSecureCookie(): Promise<boolean> {
+  if (process.env.NODE_ENV !== 'production') return false;
+  try {
+    const headerStore = await headers();
+    const forwardedProto = headerStore.get('x-forwarded-proto');
+    if (forwardedProto) {
+      return forwardedProto.split(',')[0].trim() === 'https';
+    }
+    const origin = headerStore.get('origin') ?? headerStore.get('referer');
+    if (origin) {
+      return origin.startsWith('https://');
+    }
+  } catch {
+    // Outside request context
+  }
+  return false;
+}
+
 export async function createSessionCookie(userId: string): Promise<void> {
   const token = createSessionToken(userId);
-  const cookieStore = await cookies();
+  const [cookieStore, secure] = await Promise.all([
+    cookies(),
+    shouldUseSecureCookie(),
+  ]);
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     path: '/',
     maxAge: Math.floor(SESSION_TTL_MS / 1000),
   });
