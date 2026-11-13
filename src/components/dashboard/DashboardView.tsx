@@ -10,14 +10,18 @@ import type { MonthInsights, MonthlySummaryRow } from '@/types/ledger';
 import { BalanceHero } from './BalanceHero';
 import { MonthRings } from './MonthRings';
 import { SpendingByGroup } from './SpendingByGroup';
-import { MonthFlowList } from './MonthFlowList';
+import { MonthFlowList, type CashFlowKey } from './MonthFlowList';
 
 export function DashboardView({
   summary,
   insights,
+  onSelectFlow,
+  onSelectGroup,
 }: {
   summary: MonthlySummaryRow;
   insights: MonthInsights;
+  onSelectFlow?: (key: CashFlowKey) => void;
+  onSelectGroup?: (groupName: string) => void;
 }) {
   const symbol = useCurrencySymbol();
   const dayLabels = insights.dailySpending.map((_, i) => String(i + 1));
@@ -29,9 +33,6 @@ export function DashboardView({
       <BalanceHero
         cashBalance={summary.cashBalance}
         cashChange={summary.cashChange}
-        earned={summary.income}
-        spent={summary.spending}
-        savingsBalance={summary.savingsBalance}
         dailyBalance={insights.dailyBalance}
         monthName={summary.monthName}
       />
@@ -40,9 +41,11 @@ export function DashboardView({
         <Section
           title="Daily spending"
           action={
-            <span className="text-sm tabular-nums text-neutral-500">
-              {formatTk(dailyAverage, { symbol })} avg
-            </span>
+            activeDays > 0 ? (
+              <span className="text-sm tabular-nums text-neutral-500">
+                {formatTk(dailyAverage, { symbol })} avg
+              </span>
+            ) : undefined
           }
           className="min-w-0 lg:order-2"
         >
@@ -63,7 +66,10 @@ export function DashboardView({
 
       <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
         <Section title="Where it went" className="min-w-0">
-          <SpendingByGroup groups={insights.spendingByGroup} />
+          <SpendingByGroup
+            groups={insights.spendingByGroup}
+            onSelectGroup={onSelectGroup}
+          />
         </Section>
 
         <Section title="Cash flow" className="min-w-0">
@@ -72,6 +78,7 @@ export function DashboardView({
             netLabel={`Net change in ${summary.monthName}`}
             endingBalance={summary.cashBalance}
             endingLabel="Cash left"
+            onSelectRow={onSelectFlow}
           />
         </Section>
       </div>
