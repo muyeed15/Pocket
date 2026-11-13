@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { IoAdd } from 'react-icons/io5';
 import { ACCOUNT_TYPE_LABELS, FLOW_TYPE_LABELS, MONTH_NAMES } from '@/lib/constants';
 import { formatTk, getMonthPrefix, round2 } from '@/lib/format';
 import { filterTransfers, isServiceChargeTransaction } from '@/lib/summary';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { useCurrencySymbol } from '@/components/ui/CurrencyContext';
 import { SearchField } from '@/components/ui/Field';
+import { Metric } from '@/components/ui/Metric';
 import type {
   AccountBalanceRow,
   FlowType,
@@ -121,20 +123,30 @@ export function TransactionsView({
     return charges.filter((tr) => tr.fromAccountId === accountFilter);
   }, [transfers, scope, accountFilter, flow, query, monthPrefix]);
 
-  const { totalIn, totalOut, totalNet } = useMemo(() => {
+  const { totalIn, totalOut, totalNet, inCount, outCount } = useMemo(() => {
     let cashIn = 0;
     let cashOut = 0;
+    let positiveCount = 0;
+    let negativeCount = 0;
     for (const tx of visible) {
-      if (tx.cashChange > 0) cashIn += tx.cashChange;
-      else if (tx.cashChange < 0) cashOut += Math.abs(tx.cashChange);
+      if (tx.cashChange > 0) {
+        cashIn += tx.cashChange;
+        positiveCount += 1;
+      } else if (tx.cashChange < 0) {
+        cashOut += Math.abs(tx.cashChange);
+        negativeCount += 1;
+      }
     }
     for (const tr of visibleCharges) {
       cashOut += tr.feeAmount;
+      negativeCount += 1;
     }
     return {
       totalIn: round2(cashIn),
       totalOut: round2(cashOut),
       totalNet: round2(cashIn - cashOut),
+      inCount: positiveCount,
+      outCount: negativeCount,
     };
   }, [visible, visibleCharges]);
 
@@ -142,6 +154,8 @@ export function TransactionsView({
   const hasSearch = Boolean(query.trim());
   const isFiltering = hasSearch || flow !== 'ALL' || accountFilter !== 'ALL';
   const monthLabel = `${MONTH_NAMES[selectedMonth - 1] ?? ''} ${selectedYear}`;
+  const periodSuffix =
+    scope === 'month' ? `in ${MONTH_NAMES[selectedMonth - 1] ?? ''}` : 'all time';
   const emptyMessage =
     flow === 'SERVICE_CHARGES' && !hasSearch && accountFilter === 'ALL'
       ? scope === 'month'
@@ -195,94 +209,109 @@ export function TransactionsView({
   ) : null;
 
   return (
-    <div className="space-y-6 sm:space-y-10">
-      <div className="flex flex-col gap-3 border-b border-neutral-200 pb-3 lg:flex-row lg:items-center lg:gap-8 lg:pb-4">
-        <SearchField
-          value={query}
-          onChange={setQuery}
-          label="Search transactions"
-          placeholder="Search"
-        />
-
-        <div className="flex flex-wrap items-center justify-between gap-4 sm:justify-start sm:gap-7">
-          <div className="flex gap-6 text-[15px]">
-            {(['month', 'all'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setScope(value)}
-                className={scope === value ? 'text-black' : 'text-neutral-400 hover:text-black'}
-              >
-                {value === 'month' ? 'This month' : 'All time'}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex w-full min-w-0 items-center gap-4 sm:w-auto sm:gap-7">
-            <Combobox
-              ariaLabel="Filter by type"
-              options={flowOptions}
-              value={flow}
-              onChange={(val) => setFlow((val || 'ALL') as FlowFilter)}
-              allowClear={flow !== 'ALL'}
-              placeholder="All types"
-              className="min-w-0 flex-1 sm:w-44 sm:flex-none"
-              inputClassName="border-b-0 py-1.5 text-[15px] text-neutral-600"
+    <div className="space-y-8 sm:space-y-12">
+      <div className="flex flex-wrap items-end justify-between gap-6 sm:gap-10">
+        <div className="grid flex-1 grid-cols-2 gap-6 sm:grid-cols-3 sm:gap-10">
+          <Metric
+            label="Money in"
+            value={formatTk(totalIn, { symbol })}
+            detail={`${inCount} ${inCount === 1 ? 'entry' : 'entries'}`}
+          />
+          <Metric
+            label="Money out"
+            value={formatTk(totalOut, { symbol })}
+            detail={`${outCount} ${outCount === 1 ? 'entry' : 'entries'}`}
+          />
+          <div className="col-span-2 sm:col-span-1">
+            <Metric
+              label="Net"
+              value={formatTk(totalNet, { showSign: true, symbol })}
+              detail={`${visibleCount} ${visibleCount === 1 ? 'entry' : 'entries'} ${periodSuffix}`}
             />
+          </div>
+        </div>
 
-            {accounts.length > 0 && (
+        {onAddEntry && (
+          <Button onClick={onAddEntry}>
+            <IoAdd className="text-lg" />
+            New entry
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-6 sm:space-y-10">
+        <div className="flex flex-col gap-3 border-b border-neutral-200 pb-3 lg:flex-row lg:items-center lg:gap-8 lg:pb-4">
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            label="Search transactions"
+            placeholder="Search"
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-4 sm:justify-start sm:gap-7">
+            <div className="flex gap-6 text-[15px]">
+              {(['month', 'all'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setScope(value)}
+                  className={scope === value ? 'text-black' : 'text-neutral-400 hover:text-black'}
+                >
+                  {value === 'month' ? 'This month' : 'All time'}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-4 sm:w-auto sm:gap-7">
               <Combobox
-                ariaLabel="Filter by account"
-                options={accountOptions}
-                value={accountFilter}
-                onChange={(val) => setAccountFilter(val || 'ALL')}
-                allowClear={accountFilter !== 'ALL'}
-                placeholder="All accounts"
+                ariaLabel="Filter by type"
+                options={flowOptions}
+                value={flow}
+                onChange={(val) => setFlow((val || 'ALL') as FlowFilter)}
+                allowClear={flow !== 'ALL'}
+                placeholder="All types"
                 className="min-w-0 flex-1 sm:w-44 sm:flex-none"
                 inputClassName="border-b-0 py-1.5 text-[15px] text-neutral-600"
               />
-            )}
+
+              {accounts.length > 0 && (
+                <Combobox
+                  ariaLabel="Filter by account"
+                  options={accountOptions}
+                  value={accountFilter}
+                  onChange={(val) => setAccountFilter(val || 'ALL')}
+                  allowClear={accountFilter !== 'ALL'}
+                  placeholder="All accounts"
+                  className="min-w-0 flex-1 sm:w-44 sm:flex-none"
+                  inputClassName="border-b-0 py-1.5 text-[15px] text-neutral-600"
+                />
+              )}
+
+              {isFiltering && visibleCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="whitespace-nowrap text-[14px] text-neutral-400 transition-colors hover:text-black"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
           </div>
         </div>
+
+        <TransactionList
+          transactions={visible}
+          transfers={visibleCharges}
+          isPending={isPending}
+          emptyMessage={emptyMessage}
+          emptyAction={emptyAction}
+          onEdit={onEditTransaction}
+          onDelete={onDeleteTransaction}
+          onEditTransfer={onEditTransfer}
+          onDeleteTransfer={onDeleteTransfer}
+        />
       </div>
-
-      {visibleCount > 0 && (
-        <div className="flex flex-wrap items-baseline justify-between gap-4 text-sm text-neutral-500">
-          <div className="flex items-baseline gap-4">
-            <span className="tabular-nums">
-              {visibleCount} {visibleCount === 1 ? 'entry' : 'entries'}
-            </span>
-            {isFiltering && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-neutral-400 transition-colors hover:text-black"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-1 tabular-nums">
-            {totalIn > 0 && <span>+{formatTk(totalIn, { symbol })} in</span>}
-            {totalOut > 0 && <span>-{formatTk(totalOut, { symbol })} out</span>}
-            <span className="text-black">
-              Net {formatTk(totalNet, { showSign: true, symbol })}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <TransactionList
-        transactions={visible}
-        transfers={visibleCharges}
-        isPending={isPending}
-        emptyMessage={emptyMessage}
-        emptyAction={emptyAction}
-        onEdit={onEditTransaction}
-        onDelete={onDeleteTransaction}
-        onEditTransfer={onEditTransfer}
-        onDeleteTransfer={onDeleteTransfer}
-      />
     </div>
   );
 }

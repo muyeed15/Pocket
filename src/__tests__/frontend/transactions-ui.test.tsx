@@ -330,9 +330,12 @@ describe('Transactions UI', () => {
     assert.ok(screen.getByText('Morning coffee'));
     assert.equal(screen.queryByText('Zero-fee transfer'), null);
 
-    // Nov total out = 180 expense + 18.50 service charge = 198.50
-    assert.ok(screen.getByText('-Tk 198.50 out'));
-    assert.ok(screen.getByText('Net -Tk 198.50'));
+    // Nov top metric cards: Money out = 180 + 18.50 = 198.50, Net = -198.50
+    assert.ok(screen.getByText('Money in'));
+    assert.ok(screen.getByText('Money out'));
+    assert.ok(screen.getAllByText('Tk 198.50').length >= 1);
+    assert.ok(screen.getAllByText('-Tk 198.50').length >= 1);
+    assert.equal(screen.queryByText(/-Tk 198\.50 out/), null);
 
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
     assert.deepEqual(headings, ['Thursday 12 November', 'Tuesday 10 November']);
@@ -344,14 +347,14 @@ describe('Transactions UI', () => {
 
     assert.equal(screen.queryByText('Morning coffee'), null);
     assert.ok(screen.getByText('Service charge · Cash out'));
-    assert.ok(screen.getByText('1 entry'));
-    assert.ok(screen.getByText('-Tk 18.50 out'));
+    assert.ok(screen.getByText('1 entry in November'));
+    assert.ok(screen.getByText('Tk 18.50'));
 
     // Switch to All time -> includes October service charge (-15.00), excludes zero-fee
     fireEvent.click(screen.getByRole('button', { name: 'All time' }));
     assert.ok(screen.getByText('Transfer, Bank to bKash'));
-    assert.ok(screen.getByText('2 entries'));
-    assert.ok(screen.getByText('-Tk 33.50 out'));
+    assert.ok(screen.getByText('2 entries all time'));
+    assert.ok(screen.getByText('Tk 33.50'));
 
     // Edit & Delete transfer from Ledger
     const editBtns = screen.getAllByRole('button', { name: 'Edit transfer' });
@@ -458,8 +461,8 @@ describe('Transactions UI', () => {
     assert.ok(screen.getByText('NPSB'));
     assert.ok(screen.getByText('Fund transfer charge'));
     assert.equal(screen.queryByText('Morning coffee'), null);
-    assert.ok(screen.getByText('3 entries'));
-    assert.ok(screen.getByText('-Tk 194.30 out'));
+    assert.ok(screen.getByText('3 entries all time'));
+    assert.ok(screen.getByText('Tk 194.30'));
   });
 
   it('avoids duplicate category subtitles when description is omitted and supports Clear filters and Account filter in Ledger', () => {
