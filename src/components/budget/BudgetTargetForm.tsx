@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Field, fieldClass } from '@/components/ui/Field';
+import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
+import { Field, MoneyInput } from '@/components/ui/Field';
 import type {
   BudgetGroupOption,
   BudgetItemType,
+  BudgetProgressRow,
   CategoryOption,
   SavingsFundBalanceRow,
 } from '@/types/ledger';
@@ -15,19 +17,48 @@ interface BudgetTargetFormProps {
   budgetGroups: BudgetGroupOption[];
   categories: CategoryOption[];
   savingsFunds: SavingsFundBalanceRow[];
+  initialItem?: BudgetProgressRow | null;
   isPending: boolean;
   onSubmit: (formData: FormData) => void;
 }
+
+const TYPE_OPTIONS: ComboboxOption[] = [
+  { value: 'SPENDING', label: 'Spending group' },
+  { value: 'SAVINGS', label: 'Savings fund' },
+  { value: 'INCOME', label: 'Income category' },
+];
 
 export function BudgetTargetForm({
   budgetMonthIso,
   budgetGroups,
   categories,
   savingsFunds,
+  initialItem,
   isPending,
   onSubmit,
 }: BudgetTargetFormProps) {
-  const [itemType, setItemType] = useState<BudgetItemType>('SPENDING');
+  const [itemType, setItemType] = useState<BudgetItemType | ''>(
+    initialItem?.itemType ?? ''
+  );
+  const [targetId, setTargetId] = useState(initialItem?.targetId ?? '');
+
+  const targetOptions: ComboboxOption[] = useMemo(() => {
+    if (itemType === 'SPENDING') {
+      return budgetGroups.map((bg) => ({ value: bg.id, label: bg.name }));
+    }
+    if (itemType === 'SAVINGS') {
+      return savingsFunds.map((sf) => ({
+        value: sf.savingsFundId,
+        label: sf.savingsFundName,
+      }));
+    }
+    if (itemType === 'INCOME') {
+      return categories
+        .filter((c) => c.flowType === 'INCOME')
+        .map((c) => ({ value: c.id, label: c.name }));
+    }
+    return [];
+  }, [itemType, budgetGroups, savingsFunds, categories]);
 
   return (
     <form
@@ -40,58 +71,47 @@ export function BudgetTargetForm({
       <input type="hidden" name="budgetMonth" value={budgetMonthIso} />
 
       <Field label="Type">
-        <select
+        <Combobox
           name="itemType"
+          required
+          disabled={Boolean(initialItem)}
+          options={TYPE_OPTIONS}
           value={itemType}
-          onChange={(e) => setItemType(e.target.value as BudgetItemType)}
-          className={fieldClass}
-        >
-          <option value="SPENDING">Spending group</option>
-          <option value="SAVINGS">Savings fund</option>
-          <option value="INCOME">Income category</option>
-        </select>
+          onChange={(val) => {
+            setItemType(val as BudgetItemType | '');
+            setTargetId('');
+          }}
+          placeholder="Select type"
+        />
       </Field>
 
       <Field label="Target">
-        <select name="targetId" required className={fieldClass}>
-          {itemType === 'SPENDING' &&
-            budgetGroups.map((bg) => (
-              <option key={bg.id} value={bg.id}>
-                {bg.name}
-              </option>
-            ))}
-          {itemType === 'SAVINGS' &&
-            savingsFunds.map((sf) => (
-              <option key={sf.savingsFundId} value={sf.savingsFundId}>
-                {sf.savingsFundName}
-              </option>
-            ))}
-          {itemType === 'INCOME' &&
-            categories
-              .filter((c) => c.flowType === 'INCOME')
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-        </select>
+        <Combobox
+          name="targetId"
+          required
+          disabled={!itemType || Boolean(initialItem)}
+          options={targetOptions}
+          value={targetId}
+          onChange={setTargetId}
+          placeholder="Select target"
+        />
       </Field>
 
       <Field label="Monthly target">
-        <input
-          type="number"
+        <MoneyInput
           name="plannedAmount"
           step="0.01"
           min="0"
           required
+          defaultValue={initialItem ? initialItem.plannedAmount : ''}
           autoFocus
           placeholder="0.00"
-          className={`${fieldClass} text-3xl tabular-nums`}
+          className="text-3xl"
         />
       </Field>
 
       <Button type="submit" disabled={isPending} className="w-full">
-        Save target
+        {initialItem ? 'Update target' : 'Save target'}
       </Button>
     </form>
   );

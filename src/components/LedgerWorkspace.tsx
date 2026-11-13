@@ -1,20 +1,23 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ActiveTab, LedgerSnapshot } from '@/types/ledger';
+import type { ActiveTab, LedgerSnapshot, LedgerTransactionRow } from '@/types/ledger';
 import {
+  logoutAction,
   createTransactionAction,
+  updateTransactionAction,
   deleteTransactionAction,
   createTransferAction,
   deleteTransferAction,
   upsertBudgetItemAction,
   deleteBudgetItemAction,
   updateAccountOpeningBalanceAction,
-  type ActionResult,
 } from '@/actions';
+import { useActionToast } from '@/hooks/useActionToast';
+import { PageShell } from './layout/PageShell';
 import { Sheet } from './ui/Sheet';
-import { Toast, type ToastMessage } from './ui/Toast';
+import { CurrencyProvider } from './ui/CurrencyContext';
 import { TopHeader } from './layout/TopHeader';
 import { DashboardView } from './dashboard/DashboardView';
 import { TransactionsView } from './transactions/TransactionsView';
@@ -25,10 +28,12 @@ import { YearlySummaryView } from './summary/YearlySummaryView';
 
 export function LedgerWorkspace({ data }: { data: LedgerSnapshot }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { isPending, toast, dismissToast, runAction: runMutation, startTransition } =
+    useActionToast();
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [entryOpen, setEntryOpen] = useState(false);
-  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [editingTransaction, setEditingTransaction] =
+    useState<LedgerTransactionRow | null>(null);
 
   const currentMonthSummary =
     data.monthlySummary[data.selectedMonth - 1] ?? data.monthlySummary[0];
@@ -39,37 +44,25 @@ export function LedgerWorkspace({ data }: { data: LedgerSnapshot }) {
     });
   }
 
-  function runMutation(
-    actionPromise: () => Promise<ActionResult>,
-    successText?: string,
-    onSuccess?: () => void
-  ) {
-    setToast(null);
-    startTransition(async () => {
-      const res = await actionPromise();
-      if (res?.error) {
-        setToast({ type: 'error', text: res.error });
-      } else {
-        onSuccess?.();
-        if (successText) {
-          setToast({ type: 'success', text: successText });
-        }
-      }
-    });
-  }
-
   return (
-    <div className="min-h-screen bg-white text-black">
-      <TopHeader
-        selectedYear={data.selectedYear}
-        selectedMonth={data.selectedMonth}
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        onSelectPeriod={handlePeriodChange}
-        onAdd={() => setEntryOpen(true)}
-      />
-
-      <main className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+    <CurrencyProvider symbol={data.user.currencySymbol}>
+      <PageShell
+        toast={toast}
+        onDismissToast={dismissToast}
+        header={
+          <TopHeader
+            userName={data.user.name}
+            userEmail={data.user.email}
+            selectedYear={data.selectedYear}
+            selectedMonth={data.selectedMonth}
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            onSelectPeriod={handlePeriodChange}
+            onAdd={() => setEntryOpen(true)}
+            onLogout={() => startTransition(() => logoutAction())}
+          />
+        }
+      >
         {activeTab === 'overview' && (
           <DashboardView
             summary={currentMonthSummary}
@@ -83,6 +76,8 @@ export function LedgerWorkspace({ data }: { data: LedgerSnapshot }) {
             selectedMonth={data.selectedMonth}
             transactions={data.transactions}
             isPending={isPending}
+            onAddEntry={() => setEntryOpen(true)}
+            onEditTransaction={(tx) => setEditingTransaction(tx)}
             onDeleteTransaction={(id) =>
               runMutation(() => deleteTransactionAction(id))
             }
@@ -147,25 +142,38 @@ export function LedgerWorkspace({ data }: { data: LedgerSnapshot }) {
             onSelectPeriod={handlePeriodChange}
           />
         )}
-      </main>
 
-      <Sheet title="New entry" open={entryOpen} onClose={() => setEntryOpen(false)}>
+        <Sheet
+        title={editingTransaction ? 'Edit entry' : 'New entry'}
+        open={entryOpen || editingTransaction !== null}
+        onClose={() => {
+          setEntryOpen(false);
+          setEditingTransaction(null);
+        }}
+      >
         <TransactionForm
+          key={editingTransaction?.id ?? 'new'}
           categories={data.categories}
           accounts={data.accounts}
           savingsFunds={data.savingsFunds}
+          initialTransaction={editingTransaction}
           isPending={isPending}
           onSubmit={(formData) =>
-            runMutation(
-              () => createTransactionAction(formData),
-              'Entry saved',
-              () => setEntryOpen(false)
-            )
+            editingTransaction
+              ? runMutation(
+                  () => updateTransactionAction(formData),
+                  'Entry updated',
+                  () => setEditingTransaction(null)
+                )
+              : runMutation(
+                  () => createTransactionAction(formData),
+                  'Entry saved',
+                  () => setEntryOpen(false)
+                )
           }
         />
       </Sheet>
-
-      <Toast message={toast} onDismiss={() => setToast(null)} />
-    </div>
+      </PageShell>
+    </CurrencyProvider>
   );
 }

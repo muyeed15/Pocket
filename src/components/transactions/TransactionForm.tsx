@@ -1,16 +1,23 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { FLOW_TYPE_LABELS } from '@/lib/constants';
+import { ACCOUNT_TYPE_LABELS, FLOW_TYPE_LABELS } from '@/lib/constants';
 import { todayLocalIso } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
-import { Field, fieldClass } from '@/components/ui/Field';
-import type { AccountBalanceRow, CategoryOption, SavingsFundBalanceRow } from '@/types/ledger';
+import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
+import { Field, fieldClass, MoneyInput } from '@/components/ui/Field';
+import type {
+  AccountBalanceRow,
+  CategoryOption,
+  LedgerTransactionRow,
+  SavingsFundBalanceRow,
+} from '@/types/ledger';
 
 interface TransactionFormProps {
   categories: CategoryOption[];
   accounts: AccountBalanceRow[];
   savingsFunds: SavingsFundBalanceRow[];
+  initialTransaction?: LedgerTransactionRow | null;
   isPending: boolean;
   onSubmit: (formData: FormData) => void;
 }
@@ -19,11 +26,46 @@ export function TransactionForm({
   categories,
   accounts,
   savingsFunds,
+  initialTransaction,
   isPending,
   onSubmit,
 }: TransactionFormProps) {
   const [categoryId, setCategoryId] = useState(
-    categories.find((c) => c.name === 'Food and drinks')?.id ?? categories[0]?.id ?? ''
+    initialTransaction?.categoryId ?? ''
+  );
+  const [accountId, setAccountId] = useState(
+    initialTransaction?.accountId ?? ''
+  );
+  const [savingsFundId, setSavingsFundId] = useState(
+    initialTransaction?.savingsFundId ?? ''
+  );
+  const categoryOptions: ComboboxOption[] = useMemo(
+    () =>
+      categories.map((c) => ({
+        value: c.id,
+        label: c.name,
+        hint: [FLOW_TYPE_LABELS[c.flowType], c.budgetGroupName]
+          .filter(Boolean)
+          .join(', '),
+      })),
+    [categories]
+  );
+  const accountOptions: ComboboxOption[] = useMemo(
+    () =>
+      accounts.map((a) => ({
+        value: a.accountId,
+        label: a.accountName,
+        hint: ACCOUNT_TYPE_LABELS[a.accountType],
+      })),
+    [accounts]
+  );
+  const savingsFundOptions: ComboboxOption[] = useMemo(
+    () =>
+      savingsFunds.map((sf) => ({
+        value: sf.savingsFundId,
+        label: sf.savingsFundName,
+      })),
+    [savingsFunds]
   );
   const category = useMemo(
     () => categories.find((c) => c.id === categoryId),
@@ -40,16 +82,20 @@ export function TransactionForm({
       }}
       className="space-y-7"
     >
+      {initialTransaction && (
+        <input type="hidden" name="id" value={initialTransaction.id} />
+      )}
+
       <Field label="Amount">
-        <input
-          type="number"
+        <MoneyInput
           name="amount"
           step="0.01"
           min="0.01"
           required
           autoFocus
+          defaultValue={initialTransaction?.amount}
           placeholder="0.00"
-          className={`${fieldClass} text-4xl tabular-nums`}
+          className="text-4xl"
         />
       </Field>
 
@@ -60,37 +106,32 @@ export function TransactionForm({
           [FLOW_TYPE_LABELS[category.flowType], category.budgetGroupName].filter(Boolean).join(', ')
         }
       >
-        <select
+        <Combobox
           name="categoryId"
           required
+          options={categoryOptions}
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className={fieldClass}
-        >
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+          onChange={setCategoryId}
+          placeholder="Select or type to search"
+        />
       </Field>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1.35fr_1fr]">
         <Field label="Account">
-          <select name="accountId" defaultValue={accounts[0]?.accountId} className={fieldClass}>
-            {accounts.map((a) => (
-              <option key={a.accountId} value={a.accountId}>
-                {a.accountName}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="accountId"
+            options={accountOptions}
+            value={accountId}
+            onChange={setAccountId}
+            placeholder="Optional (no account)"
+          />
         </Field>
         <Field label="Date">
           <input
             type="date"
             name="transactionDate"
             required
-            defaultValue={todayLocalIso()}
+            defaultValue={initialTransaction?.transactionDate ?? todayLocalIso()}
             className={fieldClass}
           />
         </Field>
@@ -98,26 +139,29 @@ export function TransactionForm({
 
       {isSavingsFlow && (
         <Field label="Savings fund">
-          <select
+          <Combobox
             name="savingsFundId"
-            defaultValue={category?.defaultSavingsFundId ?? savingsFunds[0]?.savingsFundId}
-            className={fieldClass}
-          >
-            {savingsFunds.map((sf) => (
-              <option key={sf.savingsFundId} value={sf.savingsFundId}>
-                {sf.savingsFundName}
-              </option>
-            ))}
-          </select>
+            required
+            options={savingsFundOptions}
+            value={savingsFundId}
+            onChange={setSavingsFundId}
+            placeholder="Select savings fund"
+          />
         </Field>
       )}
 
       <Field label="Note">
-        <input type="text" name="description" placeholder="Optional" className={fieldClass} />
+        <input
+          type="text"
+          name="description"
+          defaultValue={initialTransaction?.description ?? ''}
+          placeholder="Optional"
+          className={fieldClass}
+        />
       </Field>
 
       <Button type="submit" disabled={isPending} className="w-full">
-        Save
+        {initialTransaction ? 'Save changes' : 'Save'}
       </Button>
     </form>
   );

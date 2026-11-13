@@ -1,9 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { ACCOUNT_TYPE_LABELS } from '@/lib/constants';
 import { todayLocalIso } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
-import { Field, fieldClass } from '@/components/ui/Field';
+import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
+import { Field, fieldClass, MoneyInput } from '@/components/ui/Field';
 import type { AccountBalanceRow } from '@/types/ledger';
 
 interface TransferFormProps {
@@ -13,6 +15,19 @@ interface TransferFormProps {
 }
 
 export function TransferForm({ accounts, isPending, onSubmit }: TransferFormProps) {
+  const [fromAccountId, setFromAccountId] = useState('');
+  const [toAccountId, setToAccountId] = useState('');
+
+  const accountOptions: ComboboxOption[] = useMemo(
+    () =>
+      accounts.map((a) => ({
+        value: a.accountId,
+        label: a.accountName,
+        hint: ACCOUNT_TYPE_LABELS[a.accountType],
+      })),
+    [accounts]
+  );
+
   return (
     <form
       onSubmit={(e) => {
@@ -22,45 +37,38 @@ export function TransferForm({ accounts, isPending, onSubmit }: TransferFormProp
       className="space-y-7"
     >
       <Field label="Amount">
-        <input
-          type="number"
+        <MoneyInput
           name="amount"
           step="0.01"
           min="0.01"
           required
           autoFocus
           placeholder="0.00"
-          className={`${fieldClass} text-4xl tabular-nums`}
+          className="text-4xl"
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <Field label="From">
-          <select
+          <Combobox
             name="fromAccountId"
-            defaultValue={accounts[2]?.accountId ?? accounts[0]?.accountId}
-            className={fieldClass}
-          >
-            {accounts.map((a) => (
-              <option key={a.accountId} value={a.accountId}>
-                {a.accountName}
-              </option>
-            ))}
-          </select>
+            required
+            options={accountOptions}
+            value={fromAccountId}
+            onChange={setFromAccountId}
+            placeholder="Select account"
+          />
         </Field>
 
         <Field label="To">
-          <select
+          <Combobox
             name="toAccountId"
-            defaultValue={accounts[0]?.accountId}
-            className={fieldClass}
-          >
-            {accounts.map((a) => (
-              <option key={a.accountId} value={a.accountId}>
-                {a.accountName}
-              </option>
-            ))}
-          </select>
+            required
+            options={accountOptions}
+            value={toAccountId}
+            onChange={setToAccountId}
+            placeholder="Select account"
+          />
         </Field>
       </div>
 
