@@ -120,6 +120,7 @@ describe('summary aggregations', () => {
         id: 'tx-3',
         transactionDate: '2026-11-03',
         flowType: 'EXPENSE',
+        categoryName: 'Dining',
         budgetGroupName: 'Lifestyle',
         amount: 250,
         cashChange: -250,
@@ -128,6 +129,7 @@ describe('summary aggregations', () => {
         id: 'tx-2',
         transactionDate: '2026-11-02',
         flowType: 'EXPENSE',
+        categoryName: 'Food and drinks',
         budgetGroupName: 'Essentials',
         amount: 100,
         cashChange: -100,
@@ -153,8 +155,8 @@ describe('summary aggregations', () => {
     assert.equal(insights.dailySpending[2], 250);
     assert.deepEqual(insights.dailyBalance, [1500, 1400, 1150]);
     assert.deepEqual(insights.spendingByGroup, [
-      { name: 'Lifestyle', amount: 250 },
-      { name: 'Essentials', amount: 100 },
+      { name: 'Dining', amount: 250 },
+      { name: 'Food and drinks', amount: 100 },
     ]);
   });
 

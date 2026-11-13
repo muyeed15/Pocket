@@ -183,7 +183,7 @@ export function buildMonthInsights(params: {
 
     if (tx.flowType === 'EXPENSE') {
       dailySpending[day] += tx.amount;
-      groupTotals.set(tx.budgetGroupName, (groupTotals.get(tx.budgetGroupName) ?? 0) + tx.amount);
+      groupTotals.set(tx.categoryName, (groupTotals.get(tx.categoryName) ?? 0) + tx.amount);
     }
   }
 
