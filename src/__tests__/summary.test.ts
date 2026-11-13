@@ -4,8 +4,13 @@ import {
   buildMonthInsights,
   buildYearlyMonthlySummary,
   computeReconciliation,
+  isServiceChargeTransaction,
 } from '@/lib/summary';
-import type { AccountBalanceRow, LedgerTransactionRow } from '@/types/ledger';
+import type {
+  AccountBalanceRow,
+  LedgerTransactionRow,
+  TransferRow,
+} from '@/types/ledger';
 
 function makeTx(
   overrides: Partial<LedgerTransactionRow>
@@ -193,5 +198,147 @@ describe('summary aggregations', () => {
     });
     assert.equal(empty.ledgerCashBalance, 250);
     assert.equal(empty.difference, -250);
+  });
+
+  it('folds transfer service charges into monthly summary, daily balance, and reconciliation', () => {
+    const transfers: TransferRow[] = [
+      {
+        id: 'tr-1',
+        transferDate: '2026-10-20',
+        fromAccountId: 'a2',
+        fromAccountName: 'bKash',
+        toAccountId: 'a1',
+        toAccountName: 'Cash',
+        amount: 500,
+        feeAmount: 10,
+        description: 'Cash out',
+      },
+      {
+        id: 'tr-2',
+        transferDate: '2026-11-04',
+        fromAccountId: 'a2',
+        fromAccountName: 'bKash',
+        toAccountId: 'a1',
+        toAccountName: 'Cash',
+        amount: 1000,
+        feeAmount: 18.5,
+        description: null,
+      },
+      {
+        id: 'tr-3',
+        transferDate: '2026-11-05',
+        fromAccountId: 'a1',
+        fromAccountName: 'Cash',
+        toAccountId: 'a2',
+        toAccountName: 'bKash',
+        amount: 200,
+        feeAmount: 0,
+        description: null,
+      },
+    ];
+
+    const summary = buildYearlyMonthlySummary({
+      selectedYear: 2026,
+      openingCash: 1000,
+      openingSavings: 0,
+      transactionsDesc: [],
+      transfers,
+      plannedByMonth: new Map(),
+    });
+
+    const oct = summary[9];
+    assert.equal(oct.transferFees, 10);
+    assert.equal(oct.cashChange, -10);
+    assert.equal(oct.cashBalance, 990);
+
+    const nov = summary[10];
+    assert.equal(nov.transferFees, 18.5);
+    assert.equal(nov.cashChange, -18.5);
+    assert.equal(nov.cashBalance, 971.5);
+
+    const insights = buildMonthInsights({
+      selectedYear: 2026,
+      selectedMonth: 11,
+      openingCash: 1000,
+      transactionsDesc: [],
+      transfers,
+    });
+    assert.deepEqual(insights.dailyBalance, [990, 990, 990, 971.5]);
+
+    const accounts: AccountBalanceRow[] = [
+      {
+        accountId: 'a1',
+        accountName: 'Cash',
+        accountType: 'CASH',
+        sortOrder: 0,
+        openingBalance: 0,
+        moneyIn: 1500,
+        moneyOut: 200,
+        currentBalance: 1300,
+      },
+      {
+        accountId: 'a2',
+        accountName: 'bKash',
+        accountType: 'MFS',
+        sortOrder: 1,
+        openingBalance: 1000,
+        moneyIn: 200,
+        moneyOut: 1528.5,
+        currentBalance: -328.5,
+      },
+    ];
+
+    const reconciled = computeReconciliation({
+      accounts,
+      transactionsDesc: [],
+      transfers,
+      openingCash: 1000,
+    });
+    assert.equal(reconciled.totalHeldInAccounts, 971.5);
+    assert.equal(reconciled.ledgerCashBalance, 971.5);
+    assert.equal(reconciled.difference, 0);
+  });
+
+  it('identifies bank/transfer fee and service charge expense transactions without matching unrelated expenses', () => {
+    assert.equal(
+      isServiceChargeTransaction({
+        flowType: 'EXPENSE',
+        categoryName: 'Bank and transfer fees',
+        description: 'NPSB',
+      }),
+      true
+    );
+    assert.equal(
+      isServiceChargeTransaction({
+        flowType: 'EXPENSE',
+        categoryName: 'Bank service fees',
+        description: null,
+      }),
+      true
+    );
+    assert.equal(
+      isServiceChargeTransaction({
+        flowType: 'EXPENSE',
+        categoryName: 'Food and drinks',
+        description: 'Fund transfer charge',
+      }),
+      true
+    );
+    assert.equal(
+      isServiceChargeTransaction({
+        flowType: 'EXPENSE',
+        categoryName: 'Exam fees',
+        description: 'University exam fee',
+      }),
+      false
+    );
+    assert.equal(
+      isServiceChargeTransaction({
+        flowType: 'TRANSFER_OUT',
+        categoryName: 'Money sent',
+        description: 'Transfer fee',
+      }),
+      false
+    );
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  defaultPeriodDate,
   formatDayLabel,
   formatTk,
   getMonthPrefix,
@@ -39,5 +40,12 @@ describe('format utilities', () => {
     assert.equal(ratio(-10, 100), 0);
     assert.equal(ratio(10, 0), 1);
     assert.equal(ratio(0, 0), 0);
+  });
+
+  it('picks a valid default date inside the viewed period', () => {
+    const feb2026 = defaultPeriodDate(2026, 2);
+    assert.ok(feb2026.startsWith('2026-02-'));
+    const day = Number(feb2026.slice(8, 10));
+    assert.ok(day >= 1 && day <= 28);
   });
 });

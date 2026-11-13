@@ -4,7 +4,7 @@ installDom();
 import React from 'react';
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ActivityRings } from '@/components/ui/ActivityRings';
 import { BalanceHero } from '@/components/dashboard/BalanceHero';
 import { BarChart } from '@/components/ui/BarChart';
@@ -12,6 +12,7 @@ import { Combobox } from '@/components/ui/Combobox';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDeleteButton';
 import { CurrencyProvider } from '@/components/ui/CurrencyContext';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { SearchField } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { Toast } from '@/components/ui/Toast';
@@ -332,24 +333,154 @@ describe('UI primitives', () => {
     assert.ok(screen.getByText('No entries in 2026'));
   });
 
-  it('anchors BalanceHero sparkline at Start of month balance', () => {
+  it('shows Total balance without redundant bottom summary and anchors sparkline at Start of month balance', () => {
     render(
       <CurrencyProvider symbol="$">
         <BalanceHero
           cashBalance={1500}
-          cashChange={500}
-          earned={1000}
-          spent={500}
+          cashChange={-500}
           dailyBalance={[2000, 1500]}
           monthName="November"
         />
       </CurrencyProvider>
     );
 
+    assert.ok(screen.getByText('Total balance'));
+    assert.ok(screen.getByText('$ 1,500.00'));
+    assert.equal(screen.queryByText('Cash on hand'), null);
+    assert.equal(screen.queryByText(/Down .* in November/), null);
+    assert.equal(screen.queryByText(/Earned /), null);
+    assert.equal(screen.queryByText(/Spent /), null);
+
     const chart = screen.getByRole('img', { name: 'Daily cash balance trend' });
     fireEvent.keyDown(chart, { key: 'ArrowRight' });
     const tooltip = screen.getByRole('tooltip');
     assert.ok(tooltip.textContent?.includes('Start of November'));
-    assert.ok(tooltip.textContent?.includes('$ 1,000.00'));
+    assert.ok(tooltip.textContent?.includes('$ 2,000.00'));
+  });
+
+  it('restores fallback option label on Combobox clear and renders clear button in SearchField', () => {
+    let filterVal = 'EXPENSE';
+    const { rerender } = render(
+      <Combobox
+        ariaLabel="Type"
+        options={[
+          { value: 'ALL', label: 'All types' },
+          { value: 'EXPENSE', label: 'Expense' },
+        ]}
+        value={filterVal}
+        allowClear
+        onChange={(next) => {
+          filterVal = next || 'ALL';
+        }}
+      />
+    );
+    const combo = screen.getByRole('combobox', { name: 'Type' }) as HTMLInputElement;
+    assert.equal(combo.value, 'Expense');
+
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Clear selection' }));
+    assert.equal(filterVal, 'ALL');
+    rerender(
+      <Combobox
+        ariaLabel="Type"
+        options={[
+          { value: 'ALL', label: 'All types' },
+          { value: 'EXPENSE', label: 'Expense' },
+        ]}
+        value={filterVal}
+        allowClear
+        onChange={() => {}}
+      />
+    );
+    assert.equal(combo.value, 'All types');
+
+    let q = 'coffee';
+    render(<SearchField value={q} onChange={(next) => (q = next)} label="Find" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    assert.equal(q, '');
+  });
+
+  it('keeps Sheet and focused inputs above mobile soft keyboards and flips Combobox upward when constrained', async () => {
+    const prevHeight = window.innerHeight;
+    const prevVv = window.visualViewport;
+    const vvListeners = new Map<string, Set<EventListener>>();
+    let vvHeight = 800;
+
+    const fakeVv = {
+      get height() {
+        return vvHeight;
+      },
+      offsetTop: 0,
+      addEventListener(type: string, cb: EventListener) {
+        if (!vvListeners.has(type)) vvListeners.set(type, new Set());
+        vvListeners.get(type)!.add(cb);
+      },
+      removeEventListener(type: string, cb: EventListener) {
+        vvListeners.get(type)?.delete(cb);
+      },
+    };
+
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: fakeVv });
+
+    try {
+      let scrolledCount = 0;
+      render(
+        <Sheet title="Mobile test" open={true} onClose={() => {}}>
+          <Combobox
+            ariaLabel="Account"
+            options={[
+              { value: 'cash', label: 'Cash' },
+              { value: 'bkash', label: 'bKash' },
+            ]}
+            value=""
+            onChange={() => {}}
+          />
+          <input aria-label="Note" type="text" />
+        </Sheet>
+      );
+
+      const noteInput = screen.getByLabelText('Note') as HTMLInputElement;
+      noteInput.getBoundingClientRect = () =>
+        ({ top: 520, bottom: 560, left: 0, right: 300, width: 300, height: 40, x: 0, y: 520, toJSON() {} }) as DOMRect;
+      noteInput.scrollIntoView = () => {
+        scrolledCount += 1;
+      };
+
+      // Simulate Android overlay keyboard opening (360px keyboard height)
+      vvHeight = 440;
+      act(() => {
+        vvListeners.get('resize')?.forEach((fn) => fn(new Event('resize')));
+      });
+
+      const dialog = screen.getByRole('dialog', { name: 'Mobile test' });
+      const backdrop = dialog.parentElement as HTMLElement;
+      assert.equal(backdrop.style.paddingBottom, '360px');
+      assert.equal(dialog.style.maxHeight, '424px');
+
+      // Focusing a field obscured behind the keyboard scrolls it into view
+      fireEvent.focusIn(noteInput);
+      noteInput.focus();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 40));
+      });
+      assert.ok(scrolledCount >= 1);
+
+      // Opening Combobox near the bottom above the keyboard flips listbox upward
+      const combo = screen.getByRole('combobox', { name: 'Account' });
+      const wrapper = combo.parentElement!.parentElement!;
+      wrapper.getBoundingClientRect = () =>
+        ({ top: 340, bottom: 380, left: 0, right: 300, width: 300, height: 40, x: 0, y: 340, toJSON() {} }) as DOMRect;
+      fireEvent.focus(combo);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 40));
+      });
+
+      const listbox = screen.getByRole('listbox');
+      assert.ok(listbox.className.includes('bottom-full'));
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: prevHeight });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: prevVv });
+    }
   });
 });

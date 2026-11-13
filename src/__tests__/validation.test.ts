@@ -28,7 +28,7 @@ describe('validation helpers', () => {
     assert.equal(isIsoDate('13-11-2026'), false);
   });
 
-  it('parses transaction input with optional account and savings fund', () => {
+  it('parses transaction input requiring an account and optional savings fund', () => {
     const fd = new FormData();
     fd.set('transactionDate', '2026-11-13');
     fd.set('categoryId', UUID_1);
@@ -37,24 +37,29 @@ describe('validation helpers', () => {
     fd.set('amount', '150.5');
     fd.set('description', 'Coffee');
 
-    assert.deepEqual(parseTransactionInput(fd), {
-      transactionDate: '2026-11-13',
-      categoryId: UUID_1,
-      accountId: null,
-      savingsFundId: null,
-      amount: '150.50',
-      description: 'Coffee',
-    });
+    assert.equal(parseTransactionInput(fd), null);
 
     fd.set('accountId', 'bad-id');
     assert.equal(parseTransactionInput(fd), null);
 
     fd.set('accountId', UUID_2);
+    assert.deepEqual(parseTransactionInput(fd), {
+      transactionDate: '2026-11-13',
+      categoryId: UUID_1,
+      accountId: UUID_2,
+      savingsFundId: null,
+      amount: '150.50',
+      description: 'Coffee',
+    });
+
     fd.set('amount', '0');
+    assert.equal(parseTransactionInput(fd), null);
+
+    fd.set('amount', '150abc');
     assert.equal(parseTransactionInput(fd), null);
   });
 
-  it('parses transfer input and rejects identical accounts or negative fees', () => {
+  it('parses transfer input with optional feeAmount and rejects identical accounts or negative fees', () => {
     const fd = new FormData();
     fd.set('transferDate', '2026-11-13');
     fd.set('fromAccountId', UUID_1);
@@ -72,11 +77,20 @@ describe('validation helpers', () => {
       description: 'ATM',
     });
 
+    fd.set('feeAmount', '');
+    assert.deepEqual(parseTransferInput(fd)?.feeAmount, '0.00');
+
+    fd.delete('feeAmount');
+    assert.deepEqual(parseTransferInput(fd)?.feeAmount, '0.00');
+
     fd.set('toAccountId', UUID_1);
     assert.equal(parseTransferInput(fd), null);
 
     fd.set('toAccountId', UUID_3);
     fd.set('feeAmount', '-1');
+    assert.equal(parseTransferInput(fd), null);
+
+    fd.set('feeAmount', '12abc');
     assert.equal(parseTransferInput(fd), null);
   });
 
@@ -95,6 +109,10 @@ describe('validation helpers', () => {
     });
 
     fd.set('itemType', 'INVALID');
+    assert.equal(parseBudgetItemInput(fd), null);
+
+    fd.set('itemType', 'SPENDING');
+    fd.set('plannedAmount', '2500xyz');
     assert.equal(parseBudgetItemInput(fd), null);
   });
 });

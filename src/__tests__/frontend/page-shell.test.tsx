@@ -61,7 +61,7 @@ describe('PageShell and unified page layouts', () => {
 
     assert.equal(screen.getByRole('heading', { level: 1 }).textContent, 'Account');
     assert.ok(screen.getByText('Manage your name, email address, and password.'));
-    assert.ok(screen.getByRole('link', { name: /Ledger/i }));
+    assert.ok(screen.getByRole('link', { name: /Overview/i }));
     assert.ok(screen.getByRole('button', { name: 'User menu' }));
     assert.ok(screen.getByLabelText('Name'));
     assert.ok(screen.getByLabelText('Email'));

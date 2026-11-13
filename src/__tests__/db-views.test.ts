@@ -116,14 +116,24 @@ describe('PostgreSQL schema & views integration', () => {
       },
     ]);
 
-    await db.insert(schema.accountTransfers).values({
-      userId: testUserId,
-      transferDate: '2026-11-04',
-      fromAccountId: bankAccountId,
-      toAccountId: cashAccountId,
-      amount: '200.00',
-      feeAmount: '0.00',
-    });
+    await db.insert(schema.accountTransfers).values([
+      {
+        userId: testUserId,
+        transferDate: '2026-11-04',
+        fromAccountId: bankAccountId,
+        toAccountId: cashAccountId,
+        amount: '200.00',
+        feeAmount: '0.00',
+      },
+      {
+        userId: testUserId,
+        transferDate: '2026-11-05',
+        fromAccountId: cashAccountId,
+        toAccountId: bankAccountId,
+        amount: '100.00',
+        feeAmount: '15.00',
+      },
+    ]);
 
     await db.insert(schema.monthlyBudgetItems).values({
       userId: testUserId,
@@ -158,10 +168,10 @@ describe('PostgreSQL schema & views integration', () => {
         Number(r.current_balance),
       ])
     );
-    // Bank: 400 + 500 - 200 transfer = 700
-    assert.equal(byName.get('Bank'), 700);
-    // Cash: 600 - 150 + 200 transfer = 650
-    assert.equal(byName.get('Cash'), 650);
+    // Bank: 400 + 500 - 200 transfer + 100 transfer = 800
+    assert.equal(byName.get('Bank'), 800);
+    // Cash: 600 - 150 + 200 transfer - (100 transfer + 15 fee) = 535
+    assert.equal(byName.get('Cash'), 535);
 
     const sfRes = await db.execute(sql`
       SELECT current_balance
