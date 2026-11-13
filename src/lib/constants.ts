@@ -1,4 +1,4 @@
-import type { AccountType, ActiveTab, FlowType } from '@/types/ledger';
+import type { AccountType, ActiveTab, FlowType, SettingsTab } from '@/types/ledger';
 
 export const MONTH_NAMES = [
   'January',
@@ -22,6 +22,13 @@ export const TABS: Array<{ id: ActiveTab; label: string }> = [
   { id: 'accounts', label: 'Accounts' },
   { id: 'transfers', label: 'Transfers' },
   { id: 'summary', label: 'Year' },
+];
+
+export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: 'preferences', label: 'Preferences' },
+  { id: 'categories', label: 'Categories' },
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'planning', label: 'Budgets & funds' },
 ];
 
 export const FLOW_TYPE_LABELS: Record<FlowType, string> = {

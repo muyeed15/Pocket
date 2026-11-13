@@ -20,7 +20,11 @@ import {
   updatePreferencesAction,
   updateSavingsFundAction,
 } from '@/actions';
-import { ACCOUNT_TYPE_LABELS, FLOW_TYPE_LABELS } from '@/lib/constants';
+import {
+  ACCOUNT_TYPE_LABELS,
+  FLOW_TYPE_LABELS,
+  SETTINGS_TABS,
+} from '@/lib/constants';
 import { formatTk } from '@/lib/format';
 import { useActionToast } from '@/hooks/useActionToast';
 import { PageShell } from '@/components/layout/PageShell';
@@ -42,6 +46,7 @@ import type {
   FlowType,
   SavingsFundSettingRow,
   SettingsSnapshot,
+  SettingsTab,
 } from '@/types/ledger';
 import { CategoryForm } from './CategoryForm';
 
@@ -67,8 +72,55 @@ const FLOW_FILTER_OPTIONS: ComboboxOption[] = [
   })),
 ];
 
-export function SettingsView({ data }: { data: SettingsSnapshot }) {
+function SettingsRowActions({
+  inUseText,
+  editLabel,
+  deleteLabel,
+  confirmDeleteLabel,
+  disabled,
+  onEdit,
+  onDelete,
+}: {
+  inUseText?: string;
+  editLabel: string;
+  deleteLabel: string;
+  confirmDeleteLabel: string;
+  disabled: boolean;
+  onEdit: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      {inUseText && (
+        <span className="text-xs tabular-nums text-neutral-400">{inUseText}</span>
+      )}
+      <div className={ROW_ACTIONS_CLASS}>
+        <IconButton label={editLabel} disabled={disabled} onClick={onEdit}>
+          <IoCreateOutline />
+        </IconButton>
+        {onDelete && (
+          <ConfirmDeleteButton
+            label={deleteLabel}
+            confirmLabel={confirmDeleteLabel}
+            disabled={disabled}
+            onConfirm={onDelete}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Focused settings workspace organized into Preferences, Categories, Accounts, and Budgets & funds tabs. */
+export function SettingsView({
+  data,
+  initialTab = 'preferences',
+}: {
+  data: SettingsSnapshot;
+  initialTab?: SettingsTab;
+}) {
   const { isPending, toast, dismissToast, runAction: runMutation } = useActionToast();
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [sheet, setSheet] = useState<SheetState>(null);
   const [accountType, setAccountType] = useState<AccountType | ''>('');
   const [categoryQuery, setCategoryQuery] = useState('');
@@ -131,272 +183,359 @@ export function SettingsView({ data }: { data: SettingsSnapshot }) {
     <PageShell
       header={<SubpageHeader userName={data.user.name} userEmail={data.user.email} />}
       title="Settings"
-      description="Categories, accounts, funds, and ledger preferences."
       toast={toast}
       onDismissToast={dismissToast}
     >
-        <div className="space-y-12 sm:space-y-16">
-
-          <Section
-            title="Categories"
-            action={
-              <Button
-                variant="ghost"
-                onClick={() => setSheet({ kind: 'category', item: null })}
+      <div className="space-y-8 sm:space-y-10">
+        <div
+          role="tablist"
+          aria-label="Settings sections"
+          className="flex gap-4 overflow-x-auto border-b border-neutral-200 [scrollbar-width:none] sm:gap-7 [&::-webkit-scrollbar]:hidden"
+        >
+          {SETTINGS_TABS.map((tab, index) => {
+            const selected = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`settings-tab-${tab.id}`}
+                aria-selected={selected}
+                aria-controls={`settings-panel-${tab.id}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setActiveTab(tab.id)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                  e.preventDefault();
+                  const delta = e.key === 'ArrowRight' ? 1 : -1;
+                  const next =
+                    SETTINGS_TABS[
+                      (index + delta + SETTINGS_TABS.length) % SETTINGS_TABS.length
+                    ];
+                  setActiveTab(next.id);
+                  document.getElementById(`settings-tab-${next.id}`)?.focus();
+                }}
+                className={`shrink-0 whitespace-nowrap border-b-[1.5px] pb-2.5 text-[14px] transition-colors sm:pb-3 sm:text-[15px] ${
+                  selected
+                    ? 'border-black text-black'
+                    : 'border-transparent text-neutral-400 hover:text-black'
+                }`}
               >
-                <IoAdd className="text-base" />
-                Add category
-              </Button>
-            }
-          >
-            {data.categories.length > 0 && (
-              <div className="mb-4 flex flex-col gap-2 border-b border-neutral-100 pb-3 sm:flex-row sm:items-center sm:gap-8">
-                <SearchField
-                  value={categoryQuery}
-                  onChange={setCategoryQuery}
-                  label="Search categories"
-                  placeholder="Search categories"
-                />
-                <Combobox
-                  ariaLabel="Filter categories by type"
-                  options={FLOW_FILTER_OPTIONS}
-                  value={categoryFlow}
-                  onChange={(val) =>
-                    setCategoryFlow((val || 'ALL') as FlowType | 'ALL')
-                  }
-                  allowClear={categoryFlow !== 'ALL'}
-                  placeholder="All types"
-                  className="w-full sm:w-44"
-                  inputClassName="border-b-0 py-1.5 text-[15px] text-neutral-600"
-                />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          role="tabpanel"
+          id={`settings-panel-${activeTab}`}
+          aria-labelledby={`settings-tab-${activeTab}`}
+        >
+          {activeTab === 'preferences' && (
+            <form
+              key={`${data.user.currencyCode}-${data.user.currencySymbol}-${data.user.openingCashBalance}-${data.user.openingSavingsBalance}`}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                runMutation(
+                  () => updatePreferencesAction(fd),
+                  'Preferences saved'
+                );
+              }}
+            >
+              <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
+                <Section title="Currency">
+                  <div className="grid grid-cols-2 gap-6">
+                    <Field label="Currency code">
+                      <input
+                        type="text"
+                        name="currencyCode"
+                        required
+                        minLength={3}
+                        maxLength={3}
+                        defaultValue={data.user.currencyCode}
+                        className={`${fieldClass} uppercase`}
+                      />
+                    </Field>
+                    <Field label="Currency symbol">
+                      <input
+                        type="text"
+                        name="currencySymbol"
+                        required
+                        defaultValue={data.user.currencySymbol}
+                        className={fieldClass}
+                      />
+                    </Field>
+                  </div>
+                </Section>
+
+                <Section title="Opening balances">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <Field label="Opening cash balance">
+                      <MoneyInput
+                        symbol={data.user.currencySymbol}
+                        name="openingCashBalance"
+                        step="0.01"
+                        required
+                        defaultValue={data.user.openingCashBalance}
+                        className="text-[17px]"
+                      />
+                    </Field>
+                    <Field label="Opening savings balance">
+                      <MoneyInput
+                        symbol={data.user.currencySymbol}
+                        name="openingSavingsBalance"
+                        step="0.01"
+                        required
+                        defaultValue={data.user.openingSavingsBalance}
+                        className="text-[17px]"
+                      />
+                    </Field>
+                  </div>
+                </Section>
               </div>
-            )}
 
-            {data.categories.length === 0 ? (
-              <EmptyState>No categories yet</EmptyState>
-            ) : filteredCategories.length === 0 ? (
-              <EmptyState>No matching categories</EmptyState>
-            ) : (
-              <ul className="divide-y divide-neutral-100">
-                {filteredCategories.map((cat) => {
-                  const inUse = cat.usageCount > 0;
-                  const meta = [
-                    FLOW_TYPE_LABELS[cat.flowType],
-                    cat.budgetGroupName,
-                    cat.defaultSavingsFundName,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ');
+              <div className="mt-8 flex justify-end border-t border-neutral-200 pt-5 sm:mt-10">
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="w-full shrink-0 sm:w-auto"
+                >
+                  Save preferences
+                </Button>
+              </div>
+            </form>
+          )}
 
-                  return (
-                    <li
-                      key={cat.id}
-                      className="group flex items-center justify-between gap-4 py-4"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[17px]">{cat.name}</p>
-                        <p className="truncate text-sm text-neutral-500">{meta}</p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {inUse && (
-                          <span className="text-xs tabular-nums text-neutral-400">
-                            In use ({cat.usageCount})
-                          </span>
-                        )}
-                        <div className={ROW_ACTIONS_CLASS}>
-                          <IconButton
-                            label="Edit category"
-                            disabled={isPending}
-                            onClick={() =>
-                              setSheet({ kind: 'category', item: cat })
-                            }
-                          >
-                            <IoCreateOutline />
-                          </IconButton>
-                          {!inUse && (
-                            <ConfirmDeleteButton
-                              label="Delete category"
-                              confirmLabel="Confirm delete category"
-                              disabled={isPending}
-                              onConfirm={() =>
-                                runMutation(
-                                  () => deleteCategoryAction(cat.id),
-                                  'Category deleted'
-                                )
-                              }
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Section>
-
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
+          {activeTab === 'categories' && (
             <Section
-              title="Budget groups"
+              title="Categories"
               action={
                 <Button
                   variant="ghost"
-                  onClick={() => setSheet({ kind: 'budgetGroup', item: null })}
+                  onClick={() => setSheet({ kind: 'category', item: null })}
                 >
                   <IoAdd className="text-base" />
-                  Add
+                  Add category
                 </Button>
               }
             >
-              {data.budgetGroups.length > 0 && (
-                <div className="mb-3 border-b border-neutral-100 pb-2">
+              {data.categories.length > 0 && (
+                <div className="mb-4 flex flex-col gap-2 border-b border-neutral-100 pb-3 sm:flex-row sm:items-center sm:gap-8">
                   <SearchField
-                    value={groupQuery}
-                    onChange={setGroupQuery}
-                    label="Search budget groups"
-                    placeholder="Search budget groups"
+                    value={categoryQuery}
+                    onChange={setCategoryQuery}
+                    label="Search categories"
+                    placeholder="Search categories"
+                  />
+                  <Combobox
+                    ariaLabel="Filter categories by type"
+                    options={FLOW_FILTER_OPTIONS}
+                    value={categoryFlow}
+                    onChange={(val) =>
+                      setCategoryFlow((val || 'ALL') as FlowType | 'ALL')
+                    }
+                    allowClear={categoryFlow !== 'ALL'}
+                    placeholder="All types"
+                    className="w-full sm:w-44"
+                    inputClassName="border-b-0 py-1.5 text-[15px] text-neutral-600"
                   />
                 </div>
               )}
 
-              {data.budgetGroups.length === 0 ? (
-                <EmptyState>No budget groups yet</EmptyState>
-              ) : filteredGroups.length === 0 ? (
-                <EmptyState>No matching budget groups</EmptyState>
+              {data.categories.length === 0 ? (
+                <EmptyState>No categories yet</EmptyState>
+              ) : filteredCategories.length === 0 ? (
+                <EmptyState>No matching categories</EmptyState>
               ) : (
-                <ul className="divide-y divide-neutral-100">
-                  {filteredGroups.map((bg) => {
-                    const inUse = bg.usageCount > 0;
+                <ul className="grid grid-cols-1 md:grid-cols-2 md:gap-x-12">
+                  {filteredCategories.map((cat) => {
+                    const inUse = cat.usageCount > 0;
+                    const meta = [
+                      FLOW_TYPE_LABELS[cat.flowType],
+                      cat.budgetGroupName,
+                      cat.defaultSavingsFundName,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ');
+
                     return (
                       <li
-                        key={bg.id}
-                        className="group flex items-center justify-between gap-4 py-4"
-                      >
-                        <span className="truncate text-[17px]">{bg.name}</span>
-                        <div className="flex items-center gap-2">
-                          {inUse && (
-                            <span className="text-xs tabular-nums text-neutral-400">
-                              In use
-                            </span>
-                          )}
-                          <div className={ROW_ACTIONS_CLASS}>
-                            <IconButton
-                              label="Edit budget group"
-                              disabled={isPending}
-                              onClick={() =>
-                                setSheet({ kind: 'budgetGroup', item: bg })
-                              }
-                            >
-                              <IoCreateOutline />
-                            </IconButton>
-                            {!inUse && (
-                              <ConfirmDeleteButton
-                                label="Delete budget group"
-                                confirmLabel="Confirm delete budget group"
-                                disabled={isPending}
-                                onConfirm={() =>
-                                  runMutation(
-                                    () => deleteBudgetGroupAction(bg.id),
-                                    'Budget group deleted'
-                                  )
-                                }
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Section>
-
-            <Section
-              title="Savings funds"
-              action={
-                <Button
-                  variant="ghost"
-                  onClick={() => setSheet({ kind: 'savingsFund', item: null })}
-                >
-                  <IoAdd className="text-base" />
-                  Add
-                </Button>
-              }
-            >
-              {data.savingsFunds.length > 0 && (
-                <div className="mb-3 border-b border-neutral-100 pb-2">
-                  <SearchField
-                    value={fundQuery}
-                    onChange={setFundQuery}
-                    label="Search savings funds"
-                    placeholder="Search savings funds"
-                  />
-                </div>
-              )}
-
-              {data.savingsFunds.length === 0 ? (
-                <EmptyState>No savings funds yet</EmptyState>
-              ) : filteredFunds.length === 0 ? (
-                <EmptyState>No matching savings funds</EmptyState>
-              ) : (
-                <ul className="divide-y divide-neutral-100">
-                  {filteredFunds.map((sf) => {
-                    const inUse = sf.usageCount > 0;
-                    return (
-                      <li
-                        key={sf.id}
-                        className="group flex items-center justify-between gap-4 py-4"
+                        key={cat.id}
+                        className="group flex items-center justify-between gap-3 border-b border-neutral-100 py-3"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[17px]">{sf.name}</p>
-                          <p className="text-sm tabular-nums text-neutral-500">
-                            Opening{' '}
-                            {formatTk(sf.openingBalance, {
-                              symbol: data.user.currencySymbol,
-                            })}
+                          <p className="truncate text-[16px] sm:text-[17px]">{cat.name}</p>
+                          <p className="truncate text-xs text-neutral-500 sm:text-sm">
+                            {meta}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {inUse && (
-                            <span className="text-xs tabular-nums text-neutral-400">
-                              In use
-                            </span>
-                          )}
-                          <div className={ROW_ACTIONS_CLASS}>
-                            <IconButton
-                              label="Edit savings fund"
-                              disabled={isPending}
-                              onClick={() =>
-                                setSheet({ kind: 'savingsFund', item: sf })
-                              }
-                            >
-                              <IoCreateOutline />
-                            </IconButton>
-                            {!inUse && (
-                              <ConfirmDeleteButton
-                                label="Delete savings fund"
-                                confirmLabel="Confirm delete savings fund"
-                                disabled={isPending}
-                                onConfirm={() =>
+                        <SettingsRowActions
+                          inUseText={inUse ? `In use (${cat.usageCount})` : undefined}
+                          editLabel="Edit category"
+                          deleteLabel="Delete category"
+                          confirmDeleteLabel="Confirm delete category"
+                          disabled={isPending}
+                          onEdit={() => setSheet({ kind: 'category', item: cat })}
+                          onDelete={
+                            inUse
+                              ? undefined
+                              : () =>
                                   runMutation(
-                                    () => deleteSavingsFundAction(sf.id),
-                                    'Savings fund deleted'
+                                    () => deleteCategoryAction(cat.id),
+                                    'Category deleted'
                                   )
-                                }
-                              />
-                            )}
-                          </div>
-                        </div>
+                          }
+                        />
                       </li>
                     );
                   })}
                 </ul>
               )}
             </Section>
-          </div>
+          )}
 
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
+          {activeTab === 'planning' && (
+            <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
+              <Section
+                title="Budget groups"
+                action={
+                  <Button
+                    variant="ghost"
+                    onClick={() => setSheet({ kind: 'budgetGroup', item: null })}
+                  >
+                    <IoAdd className="text-base" />
+                    Add
+                  </Button>
+                }
+              >
+                {data.budgetGroups.length > 0 && (
+                  <div className="mb-3 border-b border-neutral-100 pb-2">
+                    <SearchField
+                      value={groupQuery}
+                      onChange={setGroupQuery}
+                      label="Search budget groups"
+                      placeholder="Search budget groups"
+                    />
+                  </div>
+                )}
+
+                {data.budgetGroups.length === 0 ? (
+                  <EmptyState>No budget groups yet</EmptyState>
+                ) : filteredGroups.length === 0 ? (
+                  <EmptyState>No matching budget groups</EmptyState>
+                ) : (
+                  <ul className="divide-y divide-neutral-100">
+                    {filteredGroups.map((bg) => {
+                      const inUse = bg.usageCount > 0;
+                      return (
+                        <li
+                          key={bg.id}
+                          className="group flex items-center justify-between gap-3 py-3"
+                        >
+                          <span className="truncate text-[16px] sm:text-[17px]">
+                            {bg.name}
+                          </span>
+                          <SettingsRowActions
+                            inUseText={inUse ? 'In use' : undefined}
+                            editLabel="Edit budget group"
+                            deleteLabel="Delete budget group"
+                            confirmDeleteLabel="Confirm delete budget group"
+                            disabled={isPending}
+                            onEdit={() => setSheet({ kind: 'budgetGroup', item: bg })}
+                            onDelete={
+                              inUse
+                                ? undefined
+                                : () =>
+                                    runMutation(
+                                      () => deleteBudgetGroupAction(bg.id),
+                                      'Budget group deleted'
+                                    )
+                            }
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Section>
+
+              <Section
+                title="Savings funds"
+                action={
+                  <Button
+                    variant="ghost"
+                    onClick={() => setSheet({ kind: 'savingsFund', item: null })}
+                  >
+                    <IoAdd className="text-base" />
+                    Add
+                  </Button>
+                }
+              >
+                {data.savingsFunds.length > 0 && (
+                  <div className="mb-3 border-b border-neutral-100 pb-2">
+                    <SearchField
+                      value={fundQuery}
+                      onChange={setFundQuery}
+                      label="Search savings funds"
+                      placeholder="Search savings funds"
+                    />
+                  </div>
+                )}
+
+                {data.savingsFunds.length === 0 ? (
+                  <EmptyState>No savings funds yet</EmptyState>
+                ) : filteredFunds.length === 0 ? (
+                  <EmptyState>No matching savings funds</EmptyState>
+                ) : (
+                  <ul className="divide-y divide-neutral-100">
+                    {filteredFunds.map((sf) => {
+                      const inUse = sf.usageCount > 0;
+                      return (
+                        <li
+                          key={sf.id}
+                          className="group flex items-center justify-between gap-3 py-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[16px] sm:text-[17px]">
+                              {sf.name}
+                            </p>
+                            {sf.openingBalance !== 0 && (
+                              <p className="text-xs tabular-nums text-neutral-500 sm:text-sm">
+                                {formatTk(sf.openingBalance, {
+                                  symbol: data.user.currencySymbol,
+                                })}
+                              </p>
+                            )}
+                          </div>
+                          <SettingsRowActions
+                            inUseText={inUse ? 'In use' : undefined}
+                            editLabel="Edit savings fund"
+                            deleteLabel="Delete savings fund"
+                            confirmDeleteLabel="Confirm delete savings fund"
+                            disabled={isPending}
+                            onEdit={() => setSheet({ kind: 'savingsFund', item: sf })}
+                            onDelete={
+                              inUse
+                                ? undefined
+                                : () =>
+                                    runMutation(
+                                      () => deleteSavingsFundAction(sf.id),
+                                      'Savings fund deleted'
+                                    )
+                            }
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Section>
+            </div>
+          )}
+
+          {activeTab === 'accounts' && (
             <Section
               title="Accounts"
               action={
@@ -413,7 +552,7 @@ export function SettingsView({ data }: { data: SettingsSnapshot }) {
               }
             >
               {data.accounts.length > 0 && (
-                <div className="mb-3 border-b border-neutral-100 pb-2">
+                <div className="mb-4 border-b border-neutral-100 pb-3">
                   <SearchField
                     value={accountQuery}
                     onChange={setAccountQuery}
@@ -428,130 +567,54 @@ export function SettingsView({ data }: { data: SettingsSnapshot }) {
               ) : filteredAccounts.length === 0 ? (
                 <EmptyState>No matching accounts</EmptyState>
               ) : (
-                <ul className="divide-y divide-neutral-100">
+                <ul className="grid grid-cols-1 md:grid-cols-2 md:gap-x-12">
                   {filteredAccounts.map((acc) => {
                     const inUse = acc.usageCount > 0;
                     return (
                       <li
                         key={acc.id}
-                        className="group flex items-center justify-between gap-4 py-4"
+                        className="group flex items-center justify-between gap-3 border-b border-neutral-100 py-3"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[17px]">{acc.name}</p>
-                          <p className="text-sm tabular-nums text-neutral-500">
-                            {ACCOUNT_TYPE_LABELS[acc.type]} · opening{' '}
-                            {formatTk(acc.openingBalance, {
-                              symbol: data.user.currencySymbol,
-                            })}
+                          <p className="truncate text-[16px] sm:text-[17px]">{acc.name}</p>
+                          <p className="text-xs tabular-nums text-neutral-500 sm:text-sm">
+                            {ACCOUNT_TYPE_LABELS[acc.type]}
+                            {acc.openingBalance !== 0
+                              ? ` · ${formatTk(acc.openingBalance, {
+                                  symbol: data.user.currencySymbol,
+                                })}`
+                              : ''}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {inUse && (
-                            <span className="text-xs tabular-nums text-neutral-400">
-                              In use
-                            </span>
-                          )}
-                          <div className={ROW_ACTIONS_CLASS}>
-                            <IconButton
-                              label="Edit account"
-                              disabled={isPending}
-                              onClick={() => {
-                                setAccountType(acc.type);
-                                setSheet({ kind: 'account', item: acc });
-                              }}
-                            >
-                              <IoCreateOutline />
-                            </IconButton>
-                            {!inUse && (
-                              <ConfirmDeleteButton
-                                label="Delete account"
-                                confirmLabel="Confirm delete account"
-                                disabled={isPending}
-                                onConfirm={() =>
+                        <SettingsRowActions
+                          inUseText={inUse ? 'In use' : undefined}
+                          editLabel="Edit account"
+                          deleteLabel="Delete account"
+                          confirmDeleteLabel="Confirm delete account"
+                          disabled={isPending}
+                          onEdit={() => {
+                            setAccountType(acc.type);
+                            setSheet({ kind: 'account', item: acc });
+                          }}
+                          onDelete={
+                            inUse
+                              ? undefined
+                              : () =>
                                   runMutation(
                                     () => deleteAccountAction(acc.id),
                                     'Account deleted'
                                   )
-                                }
-                              />
-                            )}
-                          </div>
-                        </div>
+                          }
+                        />
                       </li>
                     );
                   })}
                 </ul>
               )}
             </Section>
-
-            <Section title="Ledger preferences">
-              <form
-                key={`${data.user.currencyCode}-${data.user.currencySymbol}-${data.user.openingCashBalance}-${data.user.openingSavingsBalance}`}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const fd = new FormData(e.currentTarget);
-                  runMutation(
-                    () => updatePreferencesAction(fd),
-                    'Preferences saved'
-                  );
-                }}
-                className="space-y-7"
-              >
-                <div className="grid grid-cols-2 gap-6">
-                  <Field label="Currency code">
-                    <input
-                      type="text"
-                      name="currencyCode"
-                      required
-                      minLength={3}
-                      maxLength={3}
-                      defaultValue={data.user.currencyCode}
-                      className={`${fieldClass} uppercase`}
-                    />
-                  </Field>
-                  <Field label="Currency symbol">
-                    <input
-                      type="text"
-                      name="currencySymbol"
-                      required
-                      defaultValue={data.user.currencySymbol}
-                      className={fieldClass}
-                    />
-                  </Field>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  <Field label="Opening cash balance" hint="Baseline for Overview and Year totals">
-                    <MoneyInput
-                      symbol={data.user.currencySymbol}
-                      name="openingCashBalance"
-                      step="0.01"
-                      required
-                      defaultValue={data.user.openingCashBalance}
-                      className="text-[17px]"
-                    />
-                  </Field>
-                  <Field label="Opening savings balance" hint="Baseline before recorded savings entries">
-                    <MoneyInput
-                      symbol={data.user.currencySymbol}
-                      name="openingSavingsBalance"
-                      step="0.01"
-                      required
-                      defaultValue={data.user.openingSavingsBalance}
-                      className="text-[17px]"
-                    />
-                  </Field>
-                </div>
-
-                <div className="pt-2">
-                  <Button type="submit" disabled={isPending}>
-                    Save preferences
-                  </Button>
-                </div>
-              </form>
-            </Section>
-          </div>
+          )}
         </div>
+      </div>
 
       <Sheet
         title={sheetTitle}

@@ -22,6 +22,12 @@ export type ActiveTab =
   | 'transfers'
   | 'summary';
 
+export type SettingsTab =
+  | 'preferences'
+  | 'categories'
+  | 'accounts'
+  | 'planning';
+
 export interface LedgerUser {
   id: string;
   name: string;
@@ -149,7 +155,7 @@ export interface MonthInsights {
   dailySpending: number[];
   /** Closing cash balance per day, up to the last day with activity. */
   dailyBalance: number[];
-  /** Expense totals per budget group, largest first. */
+  /** Expense totals per category, largest first. */
   spendingByGroup: GroupSpending[];
 }
 

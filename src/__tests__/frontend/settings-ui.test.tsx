@@ -93,8 +93,34 @@ describe('Settings UI', () => {
     assert.ok(screen.getByRole('combobox', { name: 'Default savings fund' }));
   });
 
+  it('defaults to Preferences tab and switches between concise settings tabs', () => {
+    render(<SettingsView data={snapshot} />);
+
+    assert.equal(
+      screen.getByRole('tab', { name: 'Preferences' }).getAttribute('aria-selected'),
+      'true'
+    );
+    assert.ok(screen.getByRole('button', { name: 'Save preferences' }));
+    assert.ok(screen.getByLabelText(/Currency code/i));
+    assert.ok(screen.getByLabelText(/Opening cash balance/i));
+    assert.equal(screen.queryByText(/Applied when formatting/i), null);
+    assert.equal(screen.queryByText(/Changes take effect/i), null);
+    assert.equal(screen.queryByText(/3-letter ISO code/i), null);
+    assert.equal(screen.queryByText(/Baseline for Overview/i), null);
+    assert.equal(screen.queryByText('Food and drinks'), null);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Accounts' }));
+    assert.ok(screen.getByText('Cash'));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Budgets & funds' }));
+    assert.ok(screen.getByText('Essentials'));
+    assert.ok(screen.getByText('Emergency Fund'));
+  });
+
   it('hides delete button for in-use categories and opens Add category sheet', () => {
     render(<SettingsView data={snapshot} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Categories' }));
 
     assert.ok(screen.getByText('In use (3)'));
     // Only 1 unused category ("Gifts") should have a Delete category button
@@ -107,8 +133,8 @@ describe('Settings UI', () => {
     assert.ok(screen.getByRole('dialog', { name: 'New category' }));
   });
 
-  it('filters categories in SettingsView via search input', () => {
-    render(<SettingsView data={snapshot} />);
+  it('filters categories in SettingsView via search input and supports initialTab', () => {
+    render(<SettingsView data={snapshot} initialTab="categories" />);
 
     assert.ok(screen.getByText('Food and drinks'));
     assert.ok(screen.getByText('Gifts'));

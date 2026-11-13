@@ -1,13 +1,33 @@
 import { Suspense } from 'react';
+import { SETTINGS_TABS } from '@/lib/constants';
 import { getSettingsSnapshot } from '@/db/queries/settings';
 import { SettingsView } from '@/components/settings/SettingsView';
+import type { SettingsTab } from '@/types/ledger';
 
-async function SettingsContent() {
-  const snapshot = await getSettingsSnapshot();
-  return <SettingsView data={snapshot} />;
+const VALID_SETTINGS_TABS = new Set<SettingsTab>(SETTINGS_TABS.map((t) => t.id));
+
+async function SettingsContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
+  const [snapshot, params] = await Promise.all([
+    getSettingsSnapshot(),
+    searchParams,
+  ]);
+  const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const initialTab = VALID_SETTINGS_TABS.has(rawTab as SettingsTab)
+    ? (rawTab as SettingsTab)
+    : 'preferences';
+
+  return <SettingsView data={snapshot} initialTab={initialTab} />;
 }
 
-export default function SettingsPage() {
+export default function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
   return (
     <Suspense
       fallback={
@@ -16,7 +36,7 @@ export default function SettingsPage() {
         </div>
       }
     >
-      <SettingsContent />
+      <SettingsContent searchParams={searchParams} />
     </Suspense>
   );
 }

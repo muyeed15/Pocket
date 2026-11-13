@@ -94,7 +94,7 @@ export function CategoryForm({
       </Field>
 
       {isExpense && (
-        <Field label="Budget group" hint="Optional grouping for spending targets">
+        <Field label="Budget group">
           <Combobox
             name="budgetGroupId"
             options={budgetGroupOptions}
