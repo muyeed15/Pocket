@@ -1,51 +1,54 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
-import type { BudgetItemType } from '@/types/ledger';
+import { isUuid, parseBudgetItemInput } from '@/lib/validation';
 import {
   ActionResult,
   invalidateLedgerCache,
-  requireDefaultUserId,
+  ownsRecord,
+  requireCurrentUserId,
 } from './shared';
+
+const BUDGET_TARGET_TABLES = {
+  INCOME: schema.categories,
+  SPENDING: schema.budgetGroups,
+  SAVINGS: schema.savingsFunds,
+} as const;
 
 export async function upsertBudgetItemAction(
   formData: FormData
 ): Promise<ActionResult> {
-  const userId = await requireDefaultUserId();
-  const budgetMonth = String(formData.get('budgetMonth') || '').trim();
-  const itemType = String(
-    formData.get('itemType') || ''
-  ).trim() as BudgetItemType;
-  const targetId = String(formData.get('targetId') || '').trim();
-  const plannedAmountRaw = String(formData.get('plannedAmount') || '0').trim();
-  const plannedNum = parseFloat(plannedAmountRaw);
-
-  if (
-    !budgetMonth ||
-    !['INCOME', 'SPENDING', 'SAVINGS'].includes(itemType) ||
-    !targetId ||
-    !Number.isFinite(plannedNum) ||
-    plannedNum < 0
-  ) {
+  const userId = await requireCurrentUserId();
+  const parsed = parseBudgetItemInput(formData);
+  if (!parsed) {
     return { error: 'Please provide valid budget item details.' };
   }
 
-  const categoryId = itemType === 'INCOME' ? targetId : null;
-  const budgetGroupId = itemType === 'SPENDING' ? targetId : null;
-  const savingsFundId = itemType === 'SAVINGS' ? targetId : null;
+  const owned = await ownsRecord(
+    BUDGET_TARGET_TABLES[parsed.itemType],
+    parsed.targetId,
+    userId
+  );
+  if (!owned) {
+    return { error: 'Selected budget target does not exist.' };
+  }
+
+  const categoryId = parsed.itemType === 'INCOME' ? parsed.targetId : null;
+  const budgetGroupId = parsed.itemType === 'SPENDING' ? parsed.targetId : null;
+  const savingsFundId = parsed.itemType === 'SAVINGS' ? parsed.targetId : null;
 
   await db
     .insert(schema.monthlyBudgetItems)
     .values({
       userId,
-      budgetMonth,
-      itemType,
+      budgetMonth: parsed.budgetMonth,
+      itemType: parsed.itemType,
       categoryId,
       budgetGroupId,
       savingsFundId,
-      plannedAmount: plannedNum.toFixed(2),
+      plannedAmount: parsed.plannedAmount,
     })
     .onConflictDoUpdate({
       target: [
@@ -57,20 +60,32 @@ export async function upsertBudgetItemAction(
         schema.monthlyBudgetItems.savingsFundId,
       ],
       set: {
-        plannedAmount: plannedNum.toFixed(2),
+        plannedAmount: parsed.plannedAmount,
         updatedAt: new Date(),
       },
     });
 
-  invalidateLedgerCache();
+  invalidateLedgerCache(userId);
   return { ok: true };
 }
 
 export async function deleteBudgetItemAction(id: string): Promise<ActionResult> {
+  const userId = await requireCurrentUserId();
   if (!id) return { error: 'Missing budget item ID.' };
-  await db
+  if (!isUuid(id)) return { error: 'Budget target not found.' };
+
+  const deleted = await db
     .delete(schema.monthlyBudgetItems)
-    .where(eq(schema.monthlyBudgetItems.id, id));
-  invalidateLedgerCache();
+    .where(
+      and(
+        eq(schema.monthlyBudgetItems.id, id),
+        eq(schema.monthlyBudgetItems.userId, userId)
+      )
+    )
+    .returning({ id: schema.monthlyBudgetItems.id });
+
+  if (deleted.length === 0) return { error: 'Budget target not found.' };
+
+  invalidateLedgerCache(userId);
   return { ok: true };
 }

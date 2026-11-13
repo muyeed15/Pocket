@@ -1,61 +1,63 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
+import { isUuid, parseTransferInput } from '@/lib/validation';
 import {
   ActionResult,
   invalidateLedgerCache,
-  requireDefaultUserId,
+  ownsRecord,
+  requireCurrentUserId,
 } from './shared';
 
 export async function createTransferAction(
   formData: FormData
 ): Promise<ActionResult> {
-  const userId = await requireDefaultUserId();
-  const transferDate = String(formData.get('transferDate') || '').trim();
-  const fromAccountId = String(formData.get('fromAccountId') || '').trim();
-  const toAccountId = String(formData.get('toAccountId') || '').trim();
-  const amountRaw = String(formData.get('amount') || '').trim();
-  const feeAmountRaw = String(formData.get('feeAmount') || '0').trim();
-  const descriptionRaw = String(formData.get('description') || '').trim();
+  const userId = await requireCurrentUserId();
+  const parsed = parseTransferInput(formData);
 
-  const amountNum = parseFloat(amountRaw);
-  const feeNum = parseFloat(feeAmountRaw || '0');
-
-  if (
-    !transferDate ||
-    !fromAccountId ||
-    !toAccountId ||
-    fromAccountId === toAccountId ||
-    !Number.isFinite(amountNum) ||
-    amountNum <= 0
-  ) {
+  if (!parsed) {
     return {
       error:
         'Please select two different accounts and enter a positive transfer amount.',
     };
   }
 
+  const [fromOwned, toOwned] = await Promise.all([
+    ownsRecord(schema.accounts, parsed.fromAccountId, userId),
+    ownsRecord(schema.accounts, parsed.toAccountId, userId),
+  ]);
+  if (!fromOwned || !toOwned) {
+    return { error: 'Selected account does not exist.' };
+  }
+
   await db.insert(schema.accountTransfers).values({
     userId,
-    transferDate,
-    fromAccountId,
-    toAccountId,
-    amount: amountNum.toFixed(2),
-    feeAmount: Number.isFinite(feeNum) && feeNum >= 0 ? feeNum.toFixed(2) : '0.00',
-    description: descriptionRaw || null,
+    ...parsed,
   });
 
-  invalidateLedgerCache();
+  invalidateLedgerCache(userId);
   return { ok: true };
 }
 
 export async function deleteTransferAction(id: string): Promise<ActionResult> {
+  const userId = await requireCurrentUserId();
   if (!id) return { error: 'Missing transfer ID.' };
-  await db
+  if (!isUuid(id)) return { error: 'Transfer not found.' };
+
+  const deleted = await db
     .delete(schema.accountTransfers)
-    .where(eq(schema.accountTransfers.id, id));
-  invalidateLedgerCache();
+    .where(
+      and(
+        eq(schema.accountTransfers.id, id),
+        eq(schema.accountTransfers.userId, userId)
+      )
+    )
+    .returning({ id: schema.accountTransfers.id });
+
+  if (deleted.length === 0) return { error: 'Transfer not found.' };
+
+  invalidateLedgerCache(userId);
   return { ok: true };
 }
