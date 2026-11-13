@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ActivityRings } from '@/components/ui/ActivityRings';
 import { BalanceHero } from '@/components/dashboard/BalanceHero';
+import { MonthRings } from '@/components/dashboard/MonthRings';
 import { BarChart } from '@/components/ui/BarChart';
 import { Combobox } from '@/components/ui/Combobox';
 import { ConfirmDeleteButton } from '@/components/ui/ConfirmDeleteButton';
@@ -482,5 +483,117 @@ describe('UI primitives', () => {
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: prevHeight });
       Object.defineProperty(window, 'visualViewport', { configurable: true, value: prevVv });
     }
+  });
+
+  it('shows only percentages in MonthRings legend and opens tooltips on mobile tap for rings, legend, BarChart, and Sparkline', () => {
+    const { container } = render(
+      <CurrencyProvider symbol="$">
+        <div>
+          <MonthRings
+            summary={{
+              monthIndex: 11,
+              monthName: 'November',
+              income: 800,
+              spending: 750,
+              saved: 200,
+              savingsUsed: 0,
+              borrowed: 0,
+              debtPaid: 0,
+              transfersNet: 0,
+              transferFees: 0,
+              untrackedNet: 0,
+              plannedIncome: 1000,
+              plannedSpending: 1000,
+              plannedSavings: 0,
+              cashChange: 50,
+              cashBalance: 1500,
+              savingsBalance: 200,
+              totalBalance: 1700,
+            }}
+          />
+          <BarChart
+            series={[{ label: 'Spent', values: [120, 450], tone: TONES.primary }]}
+            labels={['1', '2']}
+            formatLabel={(day) => `${day} November`}
+          />
+          <Sparkline
+            values={[1000, 1250, 900]}
+            labels={['1 November', '2 November', '3 November']}
+          />
+        </div>
+      </CurrencyProvider>
+    );
+
+    // MonthRings legend keeps only labels and percentages (omits "X of Y" / dollar lines)
+    assert.ok(screen.getByText('75%'));
+    assert.ok(screen.getByText('No goal'));
+    assert.ok(screen.getByText('80%'));
+    assert.equal(screen.queryByText(/of \$ /), null);
+    assert.equal(screen.queryByText(/\$ 750\.00/), null);
+
+    // Simulate mobile touch sequence on ActivityRings SVG group: pointerdown(touch) -> mouseenter -> focus -> click
+    const svg = screen.getByRole('img', { name: 'Spent, Saved, Earned' });
+    const firstRingGroup = svg.querySelector('g')!;
+    fireEvent(
+      firstRingGroup,
+      Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' })
+    );
+    fireEvent.mouseEnter(firstRingGroup);
+    fireEvent.focus(firstRingGroup);
+    fireEvent.click(firstRingGroup);
+
+    const ringTooltip = screen.getByRole('tooltip');
+    assert.ok(ringTooltip.textContent?.includes('Spent'));
+    assert.ok(ringTooltip.textContent?.includes('$ 750.00 / $ 1,000.00'));
+
+    // Tapping a legend row switches tooltip to that ring (showing amounts even with "No goal")
+    const savedButton = screen.getByRole('button', { name: /Saved/ });
+    fireEvent(
+      savedButton,
+      Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' })
+    );
+    fireEvent.mouseEnter(savedButton);
+    fireEvent.focus(savedButton);
+    fireEvent.click(savedButton);
+    const savedTooltip = screen.getByRole('tooltip');
+    assert.ok(savedTooltip.textContent?.includes('Saved'));
+    assert.ok(savedTooltip.textContent?.includes('$ 200.00'));
+
+    // Tapping the same legend row again dismisses tooltip
+    fireEvent.click(savedButton);
+    assert.equal(screen.queryByRole('tooltip'), null);
+
+    // BarChart mobile tap (even with mouseEnter + focus before click) opens & keeps tooltip
+    const secondBar = screen.getByTitle('Spent, 2: $ 450.00').parentElement!;
+    fireEvent(
+      secondBar,
+      Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' })
+    );
+    fireEvent.mouseEnter(secondBar);
+    fireEvent.focus(secondBar);
+    fireEvent.click(secondBar);
+    const barTooltip = screen.getByRole('tooltip');
+    assert.ok(barTooltip.textContent?.includes('2 November'));
+    assert.ok(barTooltip.textContent?.includes('$ 450.00'));
+
+    // Sparkline tap/click opens & keeps tooltip at clicked position and dismisses on outside tap
+    const sparkChart = screen.getByRole('img', { name: 'Daily cash balance trend' });
+    sparkChart.getBoundingClientRect = () =>
+      ({ left: 0, right: 200, top: 0, bottom: 80, width: 200, height: 80, x: 0, y: 0, toJSON() {} }) as DOMRect;
+    fireEvent(
+      sparkChart,
+      Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' })
+    );
+    fireEvent.click(sparkChart, { clientX: 100 });
+    const sparkTooltip = screen.getByRole('tooltip');
+    assert.ok(sparkTooltip.textContent?.includes('2 November'));
+    assert.ok(sparkTooltip.textContent?.includes('$ 1,250.00'));
+
+    // Tapping outside dismisses active chart tooltip
+    fireEvent(
+      container,
+      Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' })
+    );
+    assert.equal(screen.queryByRole('tooltip'), null);
   });
 });

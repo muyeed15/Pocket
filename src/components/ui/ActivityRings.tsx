@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import { TONES } from '@/lib/constants';
 import { formatTk, ratio } from '@/lib/format';
 import { useCurrencySymbol } from './CurrencyContext';
+import { useChartInteraction } from './useChartInteraction';
 
 export interface RingDatum {
   label: string;
@@ -12,25 +13,81 @@ export interface RingDatum {
   tone: string;
 }
 
+interface ActivityRingsProps {
+  rings: RingDatum[];
+  size?: number;
+  activeIndex?: number | null;
+  onHover?: (index: number | null) => void;
+  onSelectRing?: (index: number) => void;
+  onFocusRing?: (index: number) => void;
+  onBlurRing?: (stillInside: boolean) => void;
+  onNotePointerDown?: (pointerType?: string) => void;
+  onNotePointerEnter?: (pointerType?: string) => void;
+  onDismiss?: () => void;
+}
+
 /** Concentric progress rings in the style of Apple Watch Activity. */
 export function ActivityRings({
   rings,
   size = 208,
   activeIndex: controlledIndex,
   onHover,
-}: {
-  rings: RingDatum[];
-  size?: number;
-  activeIndex?: number | null;
-  onHover?: (index: number | null) => void;
-}) {
+  onSelectRing,
+  onFocusRing,
+  onBlurRing,
+  onNotePointerDown,
+  onNotePointerEnter,
+  onDismiss,
+}: ActivityRingsProps) {
   const symbol = useCurrencySymbol();
-  const [uncontrolledIndex, setUncontrolledIndex] = useState<number | null>(null);
-  const activeIndex = controlledIndex !== undefined ? controlledIndex : uncontrolledIndex;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isControlled = controlledIndex !== undefined;
+  const interaction = useChartInteraction(containerRef, { listenOutside: !isControlled });
+  const activeIndex = isControlled ? controlledIndex : interaction.activeIndex;
 
-  function setHover(index: number | null) {
+  function handlePointerDown(pointerType?: string) {
+    if (onNotePointerDown) onNotePointerDown(pointerType);
+    else interaction.notePointerDown(pointerType);
+  }
+
+  function handlePointerEnter(pointerType?: string) {
+    if (onNotePointerEnter) onNotePointerEnter(pointerType);
+    else interaction.notePointerEnter(pointerType);
+  }
+
+  function handleHoverEnter(index: number) {
     if (onHover) onHover(index);
-    else setUncontrolledIndex(index);
+    else interaction.hoverItem(index);
+  }
+
+  function handleFocusRing(index: number) {
+    if (onFocusRing) onFocusRing(index);
+    else if (onHover) onHover(index);
+    else interaction.focusItem(index);
+  }
+
+  function handleBlurRing(stillInside: boolean) {
+    if (onBlurRing) onBlurRing(stillInside);
+    else if (onHover) {
+      if (!stillInside) onHover(null);
+    } else interaction.blurItem(stillInside);
+  }
+
+  function handleClickRing(index: number) {
+    if (onSelectRing) onSelectRing(index);
+    else if (onHover) onHover(controlledIndex === index ? null : index);
+    else interaction.togglePin(index);
+  }
+
+  function handleContainerLeave() {
+    if (onHover) onHover(null);
+    else interaction.leaveContainer();
+  }
+
+  function handleEscape() {
+    if (onDismiss) onDismiss();
+    else if (onHover) onHover(null);
+    else interaction.dismiss();
   }
 
   const stroke = size * 0.085;
@@ -40,8 +97,9 @@ export function ActivityRings({
 
   return (
     <div
-      className="relative inline-flex shrink-0 items-center justify-center pt-8"
-      onMouseLeave={() => setHover(null)}
+      ref={containerRef}
+      className="relative inline-flex shrink-0 select-none items-center justify-center pt-8"
+      onMouseLeave={handleContainerLeave}
     >
       {activeRing && (
         <div
@@ -78,7 +136,7 @@ export function ActivityRings({
         viewBox={`0 0 ${size} ${size}`}
         role="img"
         aria-label={rings.map((r) => r.label).join(', ')}
-        className="shrink-0"
+        className="shrink-0 touch-manipulation"
       >
         {rings.map((ring, i) => {
           const radius = center - stroke / 2 - i * (stroke + gap);
@@ -91,14 +149,25 @@ export function ActivityRings({
               key={ring.label}
               tabIndex={0}
               aria-label={`${ring.label}: ${formatTk(ring.value, { symbol })}${ring.target > 0 ? ` of ${formatTk(ring.target, { symbol })}` : ''}`}
-              onMouseEnter={() => setHover(i)}
-              onFocus={() => setHover(i)}
-              onBlur={() => setHover(null)}
-              onClick={() => setHover(activeIndex === i ? null : i)}
+              onPointerDown={(e) => handlePointerDown(e.pointerType)}
+              onPointerEnter={(e) => handlePointerEnter(e.pointerType)}
+              onMouseEnter={() => handleHoverEnter(i)}
+              onFocus={() => handleFocusRing(i)}
+              onBlur={(e) =>
+                handleBlurRing(
+                  Boolean(containerRef.current?.contains(e.relatedTarget as Node))
+                )
+              }
+              onClick={() => handleClickRing(i)}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') setHover(null);
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleClickRing(i);
+                } else if (e.key === 'Escape') {
+                  handleEscape();
+                }
               }}
-              className="focus:outline-none"
+              className="touch-manipulation focus:outline-none"
               style={{
                 cursor: 'pointer',
                 opacity: dimmed ? 0.3 : 1,

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { TONES } from '@/lib/constants';
 import { formatTk } from '@/lib/format';
 import { useCurrencySymbol } from './CurrencyContext';
+import { useChartInteraction } from './useChartInteraction';
 
 export interface BarSeries {
   label: string;
@@ -42,30 +43,12 @@ export function BarChart({
 }: BarChartProps) {
   const symbol = useCurrencySymbol();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const interaction = useChartInteraction(containerRef);
   const rawMax = Math.max(0, ...series.flatMap((s) => s.values));
   const hasData = rawMax > 0;
   const max = Math.max(1, rawMax);
 
-  useEffect(() => {
-    if (hoveredIndex === null) return;
-    function onPointerDown(e: PointerEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        setHoveredIndex(null);
-      }
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setHoveredIndex(null);
-    }
-    window.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [hoveredIndex]);
-
-  const inspectedIndex = hoveredIndex;
+  const inspectedIndex = interaction.activeIndex;
   const inspectedLabel =
     inspectedIndex !== null
       ? (formatLabel
@@ -76,9 +59,9 @@ export function BarChart({
   if (!hasData) {
     return (
       <div className="pt-2">
-        <div className="flex h-16 items-end gap-[3px]">
+        <div className="-mx-[1.5px] flex h-16 items-end">
           {labels.map((label, i) => (
-            <div key={`${label}-${i}`} className="flex flex-1 items-end justify-center gap-[2px]">
+            <div key={`${label}-${i}`} className="flex flex-1 items-end justify-center gap-[2px] px-[1.5px]">
               {series.map((s) => (
                 <div
                   key={s.label}
@@ -89,9 +72,9 @@ export function BarChart({
             </div>
           ))}
         </div>
-        <div className="mt-3 flex gap-[3px] text-xs text-neutral-400">
+        <div className="-mx-[1.5px] mt-3 flex text-xs text-neutral-400">
           {labels.map((label, i) => (
-            <span key={`${label}-${i}`} className="flex-1 text-center tabular-nums">
+            <span key={`${label}-${i}`} className="flex-1 px-[1.5px] text-center tabular-nums">
               {i % labelEvery === 0 ? label : ''}
             </span>
           ))}
@@ -104,8 +87,8 @@ export function BarChart({
   return (
     <div
       ref={containerRef}
-      className="relative pt-12"
-      onMouseLeave={() => setHoveredIndex(null)}
+      className="relative select-none pt-12"
+      onMouseLeave={interaction.leaveContainer}
     >
       {inspectedIndex !== null && (
         <div
@@ -133,11 +116,11 @@ export function BarChart({
         </div>
       )}
 
-      <div className="flex items-end gap-[3px]" style={{ height }}>
+      <div className="-mx-[1.5px] flex items-end" style={{ height }}>
         {labels.map((label, i) => {
-          const isHovered = hoveredIndex === i;
+          const isHovered = inspectedIndex === i;
           const isDimmedBySelection = activeIndex !== undefined && activeIndex !== i;
-          const isDimmedByHover = hoveredIndex !== null && hoveredIndex !== i;
+          const isDimmedByHover = inspectedIndex !== null && inspectedIndex !== i;
           return (
             <div
               key={`${label}-${i}`}
@@ -145,31 +128,33 @@ export function BarChart({
               aria-label={`${formatLabel ? formatLabel(label, i) : label}: ${series
                 .map((s) => `${s.label} ${formatTk(s.values[i] ?? 0, { symbol })}`)
                 .join(', ')}`}
-              onMouseEnter={() => setHoveredIndex(i)}
-              onFocus={() => setHoveredIndex(i)}
-              onBlur={(e) => {
-                if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
-                  setHoveredIndex(null);
+              onPointerDown={(e) => interaction.notePointerDown(e.pointerType)}
+              onPointerEnter={(e) => interaction.notePointerEnter(e.pointerType)}
+              onMouseEnter={() => interaction.hoverItem(i)}
+              onFocus={() => interaction.focusItem(i)}
+              onBlur={(e) =>
+                interaction.blurItem(
+                  Boolean(e.currentTarget.parentElement?.contains(e.relatedTarget as Node))
+                )
+              }
+              onClick={() => {
+                if (onSelect) {
+                  if (interaction.isTouchPointer()) interaction.togglePin(i);
+                  onSelect(i);
+                } else {
+                  interaction.togglePin(i);
                 }
               }}
-              onClick={
-                onSelect
-                  ? () => onSelect(i)
-                  : () => setHoveredIndex((prev) => (prev === i ? null : i))
-              }
-              onKeyDown={
-                onSelect
-                  ? (e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onSelect(i);
-                      }
-                    }
-                  : undefined
-              }
-              className={`flex h-full flex-1 items-end justify-center gap-[2px] rounded-t transition-opacity focus:outline-none ${
-                onSelect ? 'cursor-pointer' : 'cursor-default'
-              } ${
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (onSelect) onSelect(i);
+                  else interaction.togglePin(i);
+                } else if (e.key === 'Escape') {
+                  interaction.dismiss();
+                }
+              }}
+              className={`flex h-full flex-1 cursor-pointer touch-manipulation items-end justify-center gap-[2px] rounded-t px-[1.5px] transition-opacity focus:outline-none ${
                 isDimmedBySelection
                   ? 'opacity-30 hover:opacity-60'
                   : isDimmedByHover
@@ -195,12 +180,12 @@ export function BarChart({
           );
         })}
       </div>
-      <div className="mt-3 flex gap-[3px] text-xs text-neutral-400">
+      <div className="-mx-[1.5px] mt-3 flex text-xs text-neutral-400">
         {labels.map((label, i) => (
           <span
             key={`${label}-${i}`}
-            className={`flex-1 text-center tabular-nums transition-colors ${
-              hoveredIndex === i ? 'text-black' : ''
+            className={`flex-1 px-[1.5px] text-center tabular-nums transition-colors ${
+              inspectedIndex === i ? 'text-black' : ''
             }`}
           >
             {i % labelEvery === 0 ? label : ''}

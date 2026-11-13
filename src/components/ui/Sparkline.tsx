@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { formatTk } from '@/lib/format';
 import { useCurrencySymbol } from './CurrencyContext';
+import { useChartInteraction } from './useChartInteraction';
 
 function getScrubTooltipStyle(index: number, count: number): React.CSSProperties {
   const ratio = count > 1 ? index / (count - 1) : 0.5;
@@ -23,7 +24,10 @@ export function Sparkline({
 }) {
   const symbol = useCurrencySymbol();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isTouchScrubRef = useRef(false);
+  const interaction = useChartInteraction(containerRef);
+  const hoveredIndex = interaction.activeIndex;
 
   if (values.length < 2) return null;
 
@@ -42,12 +46,11 @@ export function Sparkline({
     .map((c) => `${c.xSvg.toFixed(1)},${c.yPx.toFixed(1)}`)
     .join(' ');
 
-  function updateFromClientX(clientX: number) {
+  function indexFromClientX(clientX: number): number | null {
     const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return;
+    if (!rect || rect.width <= 0) return null;
     const clamped = Math.min(Math.max(clientX - rect.left, 0), rect.width);
-    const idx = Math.round((clamped / rect.width) * (values.length - 1));
-    setHoveredIndex(idx);
+    return Math.round((clamped / rect.width) * (values.length - 1));
   }
 
   const active = hoveredIndex !== null ? coords[hoveredIndex] : null;
@@ -61,29 +64,62 @@ export function Sparkline({
       tabIndex={0}
       role="img"
       aria-label="Daily cash balance trend"
-      onMouseMove={(e) => updateFromClientX(e.clientX)}
-      onMouseLeave={() => setHoveredIndex(null)}
-      onTouchMove={(e) => {
-        if (e.touches[0]) updateFromClientX(e.touches[0].clientX);
+      onPointerDown={(e) => interaction.notePointerDown(e.pointerType)}
+      onPointerMove={(e) => interaction.notePointerEnter(e.pointerType)}
+      onMouseMove={(e) => {
+        if (interaction.isTouchPointer()) return;
+        const idx = indexFromClientX(e.clientX);
+        if (idx !== null) interaction.hoverItem(idx);
       }}
-      onTouchEnd={() => setHoveredIndex(null)}
+      onMouseLeave={interaction.leaveContainer}
+      onTouchStart={(e) => {
+        const touch = e.touches[0];
+        if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+        isTouchScrubRef.current = false;
+      }}
+      onTouchMove={(e) => {
+        const touch = e.touches[0];
+        const start = touchStartRef.current;
+        if (!touch || !start) return;
+        const dx = Math.abs(touch.clientX - start.x);
+        const dy = Math.abs(touch.clientY - start.y);
+        if (!isTouchScrubRef.current) {
+          if (dx > 8 && dx > dy) isTouchScrubRef.current = true;
+          else return;
+        }
+        const idx = indexFromClientX(touch.clientX);
+        if (idx !== null) interaction.pinItem(idx);
+      }}
+      onTouchEnd={() => {
+        touchStartRef.current = null;
+      }}
+      onClick={(e) => {
+        if (isTouchScrubRef.current) {
+          isTouchScrubRef.current = false;
+          return;
+        }
+        const idx = indexFromClientX(e.clientX);
+        if (idx !== null) interaction.togglePin(idx);
+      }}
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft') {
           e.preventDefault();
-          setHoveredIndex((prev) =>
-            prev === null ? values.length - 1 : Math.max(0, prev - 1)
-          );
+          interaction.setHoveredIndex((prev) => {
+            const cur = prev ?? interaction.pinnedIndex;
+            return cur === null ? values.length - 1 : Math.max(0, cur - 1);
+          });
         } else if (e.key === 'ArrowRight') {
           e.preventDefault();
-          setHoveredIndex((prev) =>
-            prev === null ? 0 : Math.min(values.length - 1, prev + 1)
-          );
+          interaction.setHoveredIndex((prev) => {
+            const cur = prev ?? interaction.pinnedIndex;
+            return cur === null ? 0 : Math.min(values.length - 1, cur + 1);
+          });
         } else if (e.key === 'Escape') {
-          setHoveredIndex(null);
+          interaction.dismiss();
         }
       }}
-      onBlur={() => setHoveredIndex(null)}
-      className="relative w-full cursor-crosshair select-none pt-8 focus:outline-none"
+      onBlur={() => interaction.blurItem(false)}
+      className="relative w-full cursor-crosshair touch-manipulation select-none pt-8 focus:outline-none"
     >
       {hoveredIndex !== null && activeValue !== null && (
         <div
