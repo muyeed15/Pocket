@@ -54,12 +54,14 @@ async function getCachedLedgerSnapshot(
     openingCash,
     openingSavings,
     transactionsDesc: transactions,
+    transfers,
     plannedByMonth,
   });
 
   const reconciliation = computeReconciliation({
     accounts,
     transactionsDesc: transactions,
+    transfers,
     openingCash,
   });
 
@@ -68,6 +70,7 @@ async function getCachedLedgerSnapshot(
     selectedMonth,
     openingCash,
     transactionsDesc: transactions,
+    transfers,
   });
 
   return {

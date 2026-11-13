@@ -1,20 +1,39 @@
 import { Suspense } from 'react';
+import { connection } from 'next/server';
 import { getLedgerSnapshot } from '@/db/queries';
+import { TABS } from '@/lib/constants';
+import type { ActiveTab } from '@/types/ledger';
 import { LedgerWorkspace } from '@/components/LedgerWorkspace';
 
-type SearchParams = Promise<{ year?: string; month?: string }>;
+type SearchParams = Promise<{ year?: string; month?: string; tab?: string }>;
 
 async function LedgerContent({ searchParams }: { searchParams: SearchParams }) {
   const resolved = await searchParams;
-  const year = resolved.year ? parseInt(resolved.year, 10) : 2026;
-  const month = resolved.month ? parseInt(resolved.month, 10) : 11;
+  const parsedYear = resolved.year ? parseInt(resolved.year, 10) : NaN;
+  const parsedMonth = resolved.month ? parseInt(resolved.month, 10) : NaN;
 
-  const validYear = Number.isFinite(year) && year >= 2020 && year <= 2100 ? year : 2026;
-  const validMonth =
-    Number.isFinite(month) && month >= 1 && month <= 12 ? month : 11;
+  const hasValidYear =
+    Number.isFinite(parsedYear) && parsedYear >= 2000 && parsedYear <= 2100;
+  const hasValidMonth =
+    Number.isFinite(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12;
+
+  let validYear = parsedYear;
+  let validMonth = parsedMonth;
+
+  if (!hasValidYear || !hasValidMonth) {
+    // Next.js Cache Components disallows reading current time during prerendering.
+    await connection();
+    const now = new Date();
+    if (!hasValidYear) validYear = now.getFullYear();
+    if (!hasValidMonth) validMonth = now.getMonth() + 1;
+  }
+
+  const initialTab = TABS.some((t) => t.id === resolved.tab)
+    ? (resolved.tab as ActiveTab)
+    : 'overview';
 
   const snapshot = await getLedgerSnapshot(validYear, validMonth);
-  return <LedgerWorkspace data={snapshot} />;
+  return <LedgerWorkspace data={snapshot} initialTab={initialTab} />;
 }
 
 export default function HomePage({

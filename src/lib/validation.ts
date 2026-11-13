@@ -8,6 +8,14 @@ export function isUuid(value: string): boolean {
   return UUID_REGEX.test(value);
 }
 
+/** Strict finite number parser rejecting trailing non-numeric characters such as "12abc". */
+export function parseStrictNumber(raw: string): number {
+  const trimmed = raw.trim();
+  if (!trimmed) return NaN;
+  const num = Number(trimmed);
+  return Number.isFinite(num) ? num : NaN;
+}
+
 /** Strict YYYY-MM-DD check that rejects nonexistent calendar dates such as Feb 31. */
 export function isIsoDate(value: string): boolean {
   const match = ISO_DATE_REGEX.exec(value);
@@ -26,7 +34,7 @@ export function isIsoDate(value: string): boolean {
 export interface ParsedTransactionInput {
   transactionDate: string;
   categoryId: string;
-  accountId: string | null;
+  accountId: string;
   savingsFundId: string | null;
   amount: string;
   description: string | null;
@@ -37,16 +45,16 @@ export function parseTransactionInput(
 ): ParsedTransactionInput | null {
   const transactionDate = String(formData.get('transactionDate') || '').trim();
   const categoryId = String(formData.get('categoryId') || '').trim();
-  const accountIdRaw = String(formData.get('accountId') || '').trim();
+  const accountId = String(formData.get('accountId') || '').trim();
   const savingsFundIdRaw = String(formData.get('savingsFundId') || '').trim();
   const amountRaw = String(formData.get('amount') || '').trim();
   const descriptionRaw = String(formData.get('description') || '').trim();
 
-  const amountNum = parseFloat(amountRaw);
+  const amountNum = parseStrictNumber(amountRaw);
   if (
     !isIsoDate(transactionDate) ||
     !isUuid(categoryId) ||
-    (accountIdRaw && !isUuid(accountIdRaw)) ||
+    !isUuid(accountId) ||
     (savingsFundIdRaw && !isUuid(savingsFundIdRaw)) ||
     !Number.isFinite(amountNum) ||
     amountNum <= 0
@@ -57,7 +65,7 @@ export function parseTransactionInput(
   return {
     transactionDate,
     categoryId,
-    accountId: accountIdRaw || null,
+    accountId,
     savingsFundId: savingsFundIdRaw || null,
     amount: amountNum.toFixed(2),
     description: descriptionRaw || null,
@@ -83,8 +91,8 @@ export function parseTransferInput(
   const feeAmountRaw = String(formData.get('feeAmount') || '0').trim();
   const descriptionRaw = String(formData.get('description') || '').trim();
 
-  const amountNum = parseFloat(amountRaw);
-  const feeNum = parseFloat(feeAmountRaw || '0');
+  const amountNum = parseStrictNumber(amountRaw);
+  const feeNum = feeAmountRaw === '' ? 0 : parseStrictNumber(feeAmountRaw);
 
   if (
     !isIsoDate(transferDate) ||
@@ -123,7 +131,7 @@ export function parseBudgetItemInput(
   const itemType = String(formData.get('itemType') || '').trim() as BudgetItemType;
   const targetId = String(formData.get('targetId') || '').trim();
   const plannedAmountRaw = String(formData.get('plannedAmount') || '0').trim();
-  const plannedNum = parseFloat(plannedAmountRaw);
+  const plannedNum = parseStrictNumber(plannedAmountRaw);
 
   if (
     !isIsoDate(budgetMonth) ||

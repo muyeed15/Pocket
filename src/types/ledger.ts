@@ -19,6 +19,7 @@ export type ActiveTab =
   | 'transactions'
   | 'budget'
   | 'accounts'
+  | 'transfers'
   | 'summary';
 
 export interface LedgerUser {
@@ -93,6 +94,7 @@ export interface MonthlySummaryRow {
   borrowed: number;
   debtPaid: number;
   transfersNet: number;
+  transferFees: number;
   untrackedNet: number;
   saved: number;
   savingsUsed: number;

@@ -1,3 +1,4 @@
+import { cacheTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getUserById } from '@/db/queries/users';
 import { getSessionUserId } from './session';
@@ -17,6 +18,7 @@ export async function getOptionalUser(): Promise<AuthenticatedUser | null> {
 
   const userId = await getSessionUserId();
   if (!userId) return null;
+  cacheTag(`ledger:${userId}`);
 
   const user = await getUserById(userId);
   if (!user) return null;

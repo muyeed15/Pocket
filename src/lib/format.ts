@@ -54,6 +54,20 @@ export function todayLocalIso(): string {
     .slice(0, 10);
 }
 
+/**
+ * Picks a sensible default YYYY-MM-DD date inside the viewed (year, month):
+ * today's date when viewing the current month, or today's day clamped to that month otherwise.
+ */
+export function defaultPeriodDate(year: number, month: number): string {
+  const today = todayLocalIso();
+  const prefix = getMonthPrefix(year, month);
+  if (today.startsWith(prefix)) return today;
+  const dayNum = Number(today.slice(8, 10)) || 1;
+  const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const clampedDay = Math.min(Math.max(1, dayNum), maxDay);
+  return `${prefix}-${String(clampedDay).padStart(2, '0')}`;
+}
+
 export function ratio(value: number, target: number): number {
   if (target > 0) return Math.min(Math.max(value / target, 0), 1);
   return value > 0 ? 1 : 0;

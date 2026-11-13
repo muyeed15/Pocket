@@ -20,6 +20,7 @@ export const TABS: Array<{ id: ActiveTab; label: string }> = [
   { id: 'transactions', label: 'Ledger' },
   { id: 'budget', label: 'Budget' },
   { id: 'accounts', label: 'Accounts' },
+  { id: 'transfers', label: 'Transfers' },
   { id: 'summary', label: 'Year' },
 ];
 
