@@ -1,27 +1,39 @@
 'use client';
 
 import React from 'react';
-import { IoAdd, IoChevronBack, IoChevronForward } from 'react-icons/io5';
+import {
+  IoAdd,
+  IoChevronBack,
+  IoChevronForward,
+} from 'react-icons/io5';
 import { MONTH_NAMES, TABS } from '@/lib/constants';
 import { IconButton } from '@/components/ui/Button';
 import type { ActiveTab } from '@/types/ledger';
+import { StickyHeader } from './PageShell';
+import { UserMenu } from './UserMenu';
 
 interface TopHeaderProps {
+  userName: string;
+  userEmail: string;
   selectedYear: number;
   selectedMonth: number;
   activeTab: ActiveTab;
   onSelectTab: (tab: ActiveTab) => void;
   onSelectPeriod: (year: number, month: number) => void;
   onAdd: () => void;
+  onLogout: () => void;
 }
 
 export function TopHeader({
+  userName,
+  userEmail,
   selectedYear,
   selectedMonth,
   activeTab,
   onSelectTab,
   onSelectPeriod,
   onAdd,
+  onLogout,
 }: TopHeaderProps) {
   const shiftMonth = (delta: number) => {
     const index = selectedYear * 12 + (selectedMonth - 1) + delta;
@@ -29,19 +41,20 @@ export function TopHeader({
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/85 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-10 gap-y-3 px-6 py-4">
-        <span className="text-2xl tracking-tight">Pocket</span>
+    <StickyHeader className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
+        <span className="text-xl tracking-tight sm:text-2xl">Pocket</span>
 
-        <nav className="order-3 -mx-1 flex w-full gap-7 overflow-x-auto px-1 md:order-2 md:w-auto">
+        <nav className="order-3 -mx-1 flex w-full gap-5 overflow-x-auto px-1 sm:gap-7 md:order-2 md:w-auto">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => onSelectTab(tab.id)}
               aria-current={activeTab === tab.id ? 'page' : undefined}
-              className={`whitespace-nowrap py-1 text-[16px] transition-colors ${
-                activeTab === tab.id ? 'text-black' : 'text-neutral-400 hover:text-black'
+              className={`whitespace-nowrap border-b-[1.5px] py-1 text-[15px] transition-colors sm:py-1.5 sm:text-[16px] ${
+                activeTab === tab.id
+                  ? 'border-black text-black'
+                  : 'border-transparent text-neutral-400 hover:text-black'
               }`}
             >
               {tab.label}
@@ -49,21 +62,30 @@ export function TopHeader({
           ))}
         </nav>
 
-        <div className="order-2 ml-auto flex items-center gap-1 md:order-3">
+        <div className="order-2 ml-auto flex items-center gap-0.5 sm:gap-1 md:order-3">
           <IconButton label="Previous month" onClick={() => shiftMonth(-1)}>
             <IoChevronBack />
           </IconButton>
-          <span className="w-36 text-center text-[16px] tabular-nums">
-            {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+          <span className="w-20 text-center text-[15px] tabular-nums sm:w-36 sm:text-[16px]">
+            <span className="sm:hidden">
+              {MONTH_NAMES[selectedMonth - 1].slice(0, 3)} {selectedYear}
+            </span>
+            <span className="hidden sm:inline">
+              {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+            </span>
           </span>
           <IconButton label="Next month" onClick={() => shiftMonth(1)}>
             <IoChevronForward />
           </IconButton>
-          <IconButton label="New entry" solid onClick={onAdd} className="ml-3">
+          <IconButton label="New entry" solid onClick={onAdd} className="ml-1.5 sm:ml-3">
             <IoAdd />
           </IconButton>
+          <UserMenu
+            userName={userName}
+            userEmail={userEmail}
+            onLogout={onLogout}
+          />
         </div>
-      </div>
-    </header>
+    </StickyHeader>
   );
 }
