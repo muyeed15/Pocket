@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache';
+import { getCurrentUser, type AuthenticatedUser } from '@/lib/auth';
 import { getMonthPrefix, toNum } from '@/lib/format';
 import {
   buildMonthInsights,
@@ -6,7 +7,6 @@ import {
   computeReconciliation,
 } from '@/lib/summary';
 import type { LedgerSnapshot } from '@/types/ledger';
-import { getDefaultUser } from './users';
 import { getTransactionsByUser } from './transactions';
 import {
   getAccountBalances,
@@ -16,15 +16,15 @@ import {
 import { getBudgetGroups, getCategories } from './taxonomy';
 import { getMonthlyBudgetProgress, getYearBudgetTotals } from './budgets';
 
-export async function getLedgerSnapshot(
+async function getCachedLedgerSnapshot(
+  userRow: AuthenticatedUser,
   selectedYear: number,
   selectedMonth: number
 ): Promise<LedgerSnapshot> {
   'use cache';
-  cacheTag('ledger');
+  cacheTag(`ledger:${userRow.id}`);
   cacheLife('minutes');
 
-  const userRow = await getDefaultUser();
   const budgetMonthStr = `${getMonthPrefix(selectedYear, selectedMonth)}-01`;
 
   const [
@@ -77,6 +77,7 @@ export async function getLedgerSnapshot(
     user: {
       id: userRow.id,
       name: userRow.name,
+      email: userRow.email,
       currencySymbol: userRow.currencySymbol,
       openingCashBalance: openingCash,
       openingSavingsBalance: openingSavings,
@@ -91,4 +92,12 @@ export async function getLedgerSnapshot(
     monthlySummary,
     reconciliation,
   };
+}
+
+export async function getLedgerSnapshot(
+  selectedYear: number,
+  selectedMonth: number
+): Promise<LedgerSnapshot> {
+  const userRow = await getCurrentUser();
+  return getCachedLedgerSnapshot(userRow, selectedYear, selectedMonth);
 }

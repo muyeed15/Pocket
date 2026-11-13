@@ -24,6 +24,7 @@ export type ActiveTab =
 export interface LedgerUser {
   id: string;
   name: string;
+  email: string;
   currencySymbol: string;
   openingCashBalance: number;
   openingSavingsBalance: number;
@@ -164,4 +165,55 @@ export interface LedgerSnapshot {
   budgetItems: BudgetProgressRow[];
   monthlySummary: MonthlySummaryRow[];
   reconciliation: ReconciliationSummary;
+}
+
+export interface CategorySettingRow {
+  id: string;
+  name: string;
+  flowType: FlowType;
+  budgetGroupId: string | null;
+  budgetGroupName: string | null;
+  defaultSavingsFundId: string | null;
+  defaultSavingsFundName: string | null;
+  usageCount: number;
+}
+
+export interface BudgetGroupSettingRow {
+  id: string;
+  name: string;
+  sortOrder: number;
+  usageCount: number;
+}
+
+export interface SavingsFundSettingRow {
+  id: string;
+  name: string;
+  openingBalance: number;
+  sortOrder: number;
+  usageCount: number;
+}
+
+export interface AccountSettingRow {
+  id: string;
+  name: string;
+  type: AccountType;
+  openingBalance: number;
+  sortOrder: number;
+  usageCount: number;
+}
+
+export interface SettingsSnapshot {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    currencyCode: string;
+    currencySymbol: string;
+    openingCashBalance: number;
+    openingSavingsBalance: number;
+  };
+  categories: CategorySettingRow[];
+  budgetGroups: BudgetGroupSettingRow[];
+  savingsFunds: SavingsFundSettingRow[];
+  accounts: AccountSettingRow[];
 }
