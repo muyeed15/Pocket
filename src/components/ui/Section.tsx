@@ -13,8 +13,8 @@ export function Section({
 }) {
   return (
     <section className={className}>
-      <div className="mb-8 flex min-h-9 items-center justify-between border-b border-neutral-200 pb-3">
-        <h2 className="text-xl tracking-tight">{title}</h2>
+      <div className="mb-5 flex min-h-8 items-center justify-between border-b border-neutral-200 pb-2.5 sm:mb-6">
+        <h2 className="text-lg tracking-tight sm:text-xl">{title}</h2>
         {action}
       </div>
       {children}
@@ -22,6 +22,16 @@ export function Section({
   );
 }
 
-export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <p className="py-10 text-center text-neutral-400">{children}</p>;
+export function EmptyState({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`py-7 text-center text-sm text-neutral-400 sm:py-9 ${className}`}>
+      {children}
+    </div>
+  );
 }

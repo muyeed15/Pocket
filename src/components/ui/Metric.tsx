@@ -12,16 +12,16 @@ export function Metric({
   size?: 'md' | 'lg';
 }) {
   return (
-    <div>
-      <p className="text-sm text-neutral-500">{label}</p>
+    <div className="min-w-0">
+      <p className="text-xs text-neutral-500 sm:text-sm">{label}</p>
       <p
-        className={`mt-2 tabular-nums tracking-tight ${
-          size === 'lg' ? 'text-5xl sm:text-7xl' : 'text-3xl'
+        className={`mt-1 whitespace-nowrap tabular-nums tracking-tight sm:mt-1.5 ${
+          size === 'lg' ? 'text-4xl sm:text-6xl' : 'text-xl sm:text-3xl'
         }`}
       >
         {value}
       </p>
-      {detail && <p className="mt-3 text-sm text-neutral-500">{detail}</p>}
+      {detail && <p className="mt-1.5 text-xs text-neutral-500 sm:mt-2 sm:text-sm">{detail}</p>}
     </div>
   );
 }

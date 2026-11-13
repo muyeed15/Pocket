@@ -24,7 +24,7 @@ export function Toast({
   if (!message) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-8 z-50 flex justify-center px-6">
+    <div className="fixed inset-x-0 bottom-8 z-[60] flex justify-center px-6">
       <div
         role="status"
         className={`flex items-center gap-4 rounded-full py-2.5 pl-6 pr-2.5 text-[15px] shadow-[0_12px_40px_rgba(0,0,0,0.12)] ${

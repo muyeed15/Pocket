@@ -34,10 +34,10 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl border border-neutral-200 bg-white p-8 shadow-[0_24px_80px_rgba(0,0,0,0.08)] sm:rounded-3xl sm:p-10"
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-neutral-200 bg-white p-6 shadow-[0_24px_80px_rgba(0,0,0,0.08)] sm:rounded-3xl sm:p-10"
       >
-        <div className="mb-10 flex items-center justify-between">
-          <h2 className="text-3xl tracking-tight">{title}</h2>
+        <div className="mb-6 flex items-center justify-between sm:mb-8">
+          <h2 className="text-2xl tracking-tight sm:text-3xl">{title}</h2>
           <IconButton label="Close" onClick={onClose}>
             <IoClose />
           </IconButton>
