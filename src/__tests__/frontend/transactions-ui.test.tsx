@@ -7,7 +7,10 @@ import assert from 'node:assert/strict';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { TransactionList } from '@/components/transactions/TransactionList';
-import { TransactionsView } from '@/components/transactions/TransactionsView';
+import {
+  CASH_FLOW_DRILLDOWN_MAP,
+  TransactionsView,
+} from '@/components/transactions/TransactionsView';
 import type {
   AccountBalanceRow,
   CategoryOption,
@@ -538,5 +541,170 @@ describe('Transactions UI', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     assert.ok(screen.getByText('Morning coffee'));
+  });
+
+  it('filters Transfers and Adjustments groups and maps every cash-flow drill-down away from ALL', () => {
+    assert.deepEqual(CASH_FLOW_DRILLDOWN_MAP, {
+      income: 'INCOME',
+      spending: 'EXPENSE',
+      borrowed: 'BORROWING',
+      debtPaid: 'DEBT_PAYMENT',
+      transfersNet: 'TRANSFERS',
+      transferFees: 'SERVICE_CHARGES',
+      untrackedNet: 'ADJUSTMENTS',
+      saved: 'SAVINGS_DEPOSIT',
+      savingsUsed: 'SAVINGS_WITHDRAWAL',
+    });
+
+    const drilldownTx: LedgerTransactionRow[] = [
+      ...sampleTx,
+      {
+        id: 'tx-transfer-in',
+        entrySequence: 5,
+        transactionDate: '2026-11-11',
+        description: 'Received from card wallet',
+        amount: 500,
+        legacyCategory: null,
+        categoryId: 'cat-tr-in',
+        categoryName: 'Transfer in',
+        flowType: 'TRANSFER_IN',
+        budgetGroupId: null,
+        budgetGroupName: 'Not budgeted',
+        savingsFundId: null,
+        savingsFundName: null,
+        accountId: 'acc-cash',
+        accountName: 'Cash',
+        cashChange: 500,
+        runningCashBalance: 1320,
+        savingsChange: 0,
+        runningSavingsBalance: 0,
+      },
+      {
+        id: 'tx-transfer-out',
+        entrySequence: 6,
+        transactionDate: '2026-11-12',
+        description: 'Sent to bKash wallet',
+        amount: 300,
+        legacyCategory: null,
+        categoryId: 'cat-tr-out',
+        categoryName: 'Transfer out',
+        flowType: 'TRANSFER_OUT',
+        budgetGroupId: null,
+        budgetGroupName: 'Not budgeted',
+        savingsFundId: null,
+        savingsFundName: null,
+        accountId: 'acc-cash',
+        accountName: 'Cash',
+        cashChange: -300,
+        runningCashBalance: 1020,
+        savingsChange: 0,
+        runningSavingsBalance: 0,
+      },
+      {
+        id: 'tx-untracked-in',
+        entrySequence: 7,
+        transactionDate: '2026-11-13',
+        description: 'Found wallet balance',
+        amount: 200,
+        legacyCategory: null,
+        categoryId: 'cat-adj-in',
+        categoryName: 'Untracked money in',
+        flowType: 'UNTRACKED_IN',
+        budgetGroupId: null,
+        budgetGroupName: 'Not budgeted',
+        savingsFundId: null,
+        savingsFundName: null,
+        accountId: 'acc-cash',
+        accountName: 'Cash',
+        cashChange: 200,
+        runningCashBalance: 1220,
+        savingsChange: 0,
+        runningSavingsBalance: 0,
+      },
+      {
+        id: 'tx-untracked-out',
+        entrySequence: 8,
+        transactionDate: '2026-11-14',
+        description: 'Lost petty cash',
+        amount: 50,
+        legacyCategory: null,
+        categoryId: 'cat-adj-out',
+        categoryName: 'Untracked money out',
+        flowType: 'UNTRACKED_OUT',
+        budgetGroupId: null,
+        budgetGroupName: 'Not budgeted',
+        savingsFundId: null,
+        savingsFundName: null,
+        accountId: 'acc-cash',
+        accountName: 'Cash',
+        cashChange: -50,
+        runningCashBalance: 1170,
+        savingsChange: 0,
+        runningSavingsBalance: 0,
+      },
+    ];
+
+    const sampleTransfers: TransferRow[] = [
+      {
+        id: 'tr-fee',
+        transferDate: '2026-11-12',
+        description: 'ATM transfer fee',
+        fromAccountId: 'acc-cash',
+        fromAccountName: 'Cash',
+        toAccountId: 'acc-bkash',
+        toAccountName: 'bKash',
+        amount: 1000,
+        feeAmount: 15,
+      },
+    ];
+
+    const { rerender } = render(
+      <TransactionsView
+        selectedYear={2026}
+        selectedMonth={11}
+        transactions={drilldownTx}
+        transfers={sampleTransfers}
+        initialFlow="TRANSFERS"
+        isPending={false}
+        onEditTransaction={() => {}}
+        onDeleteTransaction={() => {}}
+      />
+    );
+
+    assert.ok(screen.getByText('Received from card wallet'));
+    assert.ok(screen.getByText('Sent to bKash wallet'));
+    assert.equal(screen.queryByText('Morning coffee'), null);
+    assert.equal(screen.queryByText('Found wallet balance'), null);
+    assert.equal(screen.queryByText('ATM transfer fee'), null);
+
+    // Selecting Adjustments via combobox switches to UNTRACKED_IN and UNTRACKED_OUT only
+    const flowCombobox = screen.getByRole('combobox', { name: 'Filter by type' });
+    fireEvent.focus(flowCombobox);
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Adjustments' }));
+
+    assert.ok(screen.getByText('Found wallet balance'));
+    assert.ok(screen.getByText('Lost petty cash'));
+    assert.equal(screen.queryByText('Received from card wallet'), null);
+    assert.equal(screen.queryByText('Sent to bKash wallet'), null);
+    assert.equal(screen.queryByText('Morning coffee'), null);
+
+    // Passing initialFlow="ADJUSTMENTS" directly (overview drill-down preset) yields same group
+    rerender(
+      <TransactionsView
+        key="adj-preset"
+        selectedYear={2026}
+        selectedMonth={11}
+        transactions={drilldownTx}
+        transfers={sampleTransfers}
+        initialFlow="ADJUSTMENTS"
+        isPending={false}
+        onEditTransaction={() => {}}
+        onDeleteTransaction={() => {}}
+      />
+    );
+
+    assert.ok(screen.getByText('Found wallet balance'));
+    assert.ok(screen.getByText('Lost petty cash'));
+    assert.equal(screen.queryByText('Morning coffee'), null);
   });
 });
