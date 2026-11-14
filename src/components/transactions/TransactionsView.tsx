@@ -16,10 +16,30 @@ import type {
   LedgerTransactionRow,
   TransferRow,
 } from '@/types/ledger';
+import type { CashFlowKey } from '../dashboard/MonthFlowList';
 import { TransactionList } from './TransactionList';
 
 type Scope = 'month' | 'all';
-export type FlowFilter = FlowType | 'ALL' | 'SERVICE_CHARGES';
+type FlowFilterGroup = 'TRANSFERS' | 'ADJUSTMENTS';
+export type FlowFilter = FlowType | 'ALL' | 'SERVICE_CHARGES' | FlowFilterGroup;
+
+const FLOW_FILTER_GROUPS: Record<FlowFilterGroup, readonly FlowType[]> = {
+  TRANSFERS: ['TRANSFER_IN', 'TRANSFER_OUT'],
+  ADJUSTMENTS: ['UNTRACKED_IN', 'UNTRACKED_OUT'],
+};
+
+/** Maps each overview cash-flow row to the exact Ledger flow filter representing its entries. */
+export const CASH_FLOW_DRILLDOWN_MAP: Record<CashFlowKey, FlowFilter> = {
+  income: 'INCOME',
+  spending: 'EXPENSE',
+  borrowed: 'BORROWING',
+  debtPaid: 'DEBT_PAYMENT',
+  transfersNet: 'TRANSFERS',
+  transferFees: 'SERVICE_CHARGES',
+  untrackedNet: 'ADJUSTMENTS',
+  saved: 'SAVINGS_DEPOSIT',
+  savingsUsed: 'SAVINGS_WITHDRAWAL',
+};
 
 interface TransactionsViewProps {
   selectedYear: number;
@@ -68,6 +88,8 @@ export function TransactionsView({
     () => [
       { value: 'ALL', label: 'All types' },
       { value: 'SERVICE_CHARGES', label: 'Service charges' },
+      { value: 'TRANSFERS', label: 'Transfers' },
+      { value: 'ADJUSTMENTS', label: 'Adjustments' },
       ...(Object.keys(FLOW_TYPE_LABELS) as FlowType[]).map((ft) => ({
         value: ft,
         label: FLOW_TYPE_LABELS[ft],
@@ -93,8 +115,12 @@ export function TransactionsView({
     return transactions.filter((tx) => {
       if (scope === 'month' && !tx.transactionDate.startsWith(monthPrefix)) return false;
       if (accountFilter !== 'ALL' && tx.accountId !== accountFilter) return false;
+      const flowGroup =
+        flow in FLOW_FILTER_GROUPS ? FLOW_FILTER_GROUPS[flow as FlowFilterGroup] : null;
       if (flow === 'SERVICE_CHARGES') {
         if (!isServiceChargeTransaction(tx)) return false;
+      } else if (flowGroup) {
+        if (!flowGroup.includes(tx.flowType)) return false;
       } else if (flow !== 'ALL' && tx.flowType !== flow) {
         return false;
       }
