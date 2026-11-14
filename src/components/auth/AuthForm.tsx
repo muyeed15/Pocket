@@ -120,29 +120,17 @@ export function AuthForm({ mode }: AuthFormProps) {
           </div>
         </form>
 
-        <footer className="border-t border-neutral-100 pt-6 text-sm text-neutral-500">
-          {isRegister ? (
-            <>
-              Already have an account?{' '}
-              <Link
-                href="/login"
-                className="text-black underline underline-offset-4 hover:text-neutral-600"
-              >
-                Sign in
-              </Link>
-            </>
-          ) : (
-            <>
-              New to Pocket?{' '}
-              <Link
-                href="/register"
-                className="text-black underline underline-offset-4 hover:text-neutral-600"
-              >
-                Create an account
-              </Link>
-            </>
-          )}
-        </footer>
+        {isRegister && (
+          <footer className="border-t border-neutral-100 pt-6 text-sm text-neutral-500">
+            Already have an account?{' '}
+            <Link
+              href="/login"
+              className="text-black underline underline-offset-4 hover:text-neutral-600"
+            >
+              Sign in
+            </Link>
+          </footer>
+        )}
     </PageShell>
   );
 }

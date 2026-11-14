@@ -77,7 +77,7 @@ describe('PageShell and unified page layouts', () => {
     const { rerender } = render(<AuthForm mode="login" />);
     assert.ok(screen.getByText('Pocket'));
     assert.equal(screen.getByRole('heading', { level: 1 }).textContent, 'Sign in');
-    assert.equal(screen.getByRole('link', { name: 'Create an account' }).getAttribute('href'), '/register');
+    assert.equal(screen.queryByRole('link', { name: 'Create an account' }), null);
 
     rerender(<AuthForm mode="register" />);
     assert.equal(screen.getByRole('heading', { level: 1 }).textContent, 'Create account');
