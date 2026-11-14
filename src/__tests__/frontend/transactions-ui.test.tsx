@@ -9,7 +9,9 @@ import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import {
   CASH_FLOW_DRILLDOWN_MAP,
+  DEFAULT_LEDGER_FILTERS,
   TransactionsView,
+  type LedgerFilterState,
 } from '@/components/transactions/TransactionsView';
 import type {
   AccountBalanceRow,
@@ -706,5 +708,85 @@ describe('Transactions UI', () => {
     assert.ok(screen.getByText('Found wallet balance'));
     assert.ok(screen.getByText('Lost petty cash'));
     assert.equal(screen.queryByText('Morning coffee'), null);
+  });
+
+  it('retains filter resets to All across tab unmounts instead of reverting to drill-down preset', () => {
+    const loanTx: LedgerTransactionRow[] = [
+      ...sampleTx,
+      {
+        id: 'tx-loan',
+        entrySequence: 5,
+        transactionDate: '2026-11-12',
+        description: 'Friend loan received',
+        amount: 2000,
+        legacyCategory: null,
+        categoryId: 'cat-loan',
+        categoryName: 'Loan received',
+        flowType: 'BORROWING',
+        budgetGroupId: null,
+        budgetGroupName: 'Not budgeted',
+        savingsFundId: null,
+        savingsFundName: null,
+        accountId: 'acc-cash',
+        accountName: 'Cash',
+        cashChange: 2000,
+        runningCashBalance: 2820,
+        savingsChange: 0,
+        runningSavingsBalance: 0,
+      },
+    ];
+
+    function TabHarness() {
+      const [tab, setTab] = React.useState<'ledger' | 'overview'>('ledger');
+      const [filters, setFilters] = React.useState<LedgerFilterState>({
+        ...DEFAULT_LEDGER_FILTERS,
+        flow: 'BORROWING',
+      });
+      return (
+        <div>
+          <button type="button" onClick={() => setTab('overview')}>
+            Overview tab
+          </button>
+          <button type="button" onClick={() => setTab('ledger')}>
+            Ledger tab
+          </button>
+          {tab === 'ledger' ? (
+            <TransactionsView
+              selectedYear={2026}
+              selectedMonth={11}
+              transactions={loanTx}
+              filters={filters}
+              onFiltersChange={setFilters}
+              isPending={false}
+              onEditTransaction={() => {}}
+              onDeleteTransaction={() => {}}
+            />
+          ) : (
+            <div>Overview placeholder</div>
+          )}
+        </div>
+      );
+    }
+
+    render(<TabHarness />);
+
+    // Initially shows Borrowing drill-down only
+    assert.ok(screen.getByText('Friend loan received'));
+    assert.equal(screen.queryByText('Morning coffee'), null);
+
+    // Reset filter to All types via Clear filters, then switch away and back
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    assert.ok(screen.getByText('Morning coffee'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Overview tab' }));
+    assert.equal(screen.queryByText('Friend loan received'), null);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ledger tab' }));
+    assert.ok(screen.getByText('Friend loan received'));
+    assert.ok(screen.getByText('Morning coffee'));
+    const flowCombobox = screen.getByRole('combobox', {
+      name: 'Filter by type',
+    }) as HTMLInputElement;
+    assert.equal(flowCombobox.value, 'All types');
   });
 });
