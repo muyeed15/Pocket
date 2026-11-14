@@ -23,13 +23,17 @@ import {
   updateAccountOpeningBalanceAction,
 } from '@/actions';
 import { useActionToast } from '@/hooks/useActionToast';
+import {
+  scrollWindowToTop,
+  useResetScrollOnChange,
+} from '@/hooks/useResetScrollOnChange';
 import { PageShell } from './layout/PageShell';
 import { Sheet } from './ui/Sheet';
 import { CurrencyProvider } from './ui/CurrencyContext';
 import { TopHeader } from './layout/TopHeader';
 import { DashboardView } from './dashboard/DashboardView';
-import type { CashFlowKey } from './dashboard/MonthFlowList';
 import {
+  CASH_FLOW_DRILLDOWN_MAP,
   TransactionsView,
   type FlowFilter,
 } from './transactions/TransactionsView';
@@ -39,18 +43,6 @@ import { AccountsView } from './accounts/AccountsView';
 import { TransfersView } from './transfers/TransfersView';
 import { TransferForm } from './transfers/TransferForm';
 import { YearlySummaryView } from './summary/YearlySummaryView';
-
-const FLOW_DRILLDOWN_MAP: Record<CashFlowKey, FlowFilter> = {
-  income: 'INCOME',
-  spending: 'EXPENSE',
-  borrowed: 'BORROWING',
-  debtPaid: 'DEBT_PAYMENT',
-  transfersNet: 'ALL',
-  transferFees: 'SERVICE_CHARGES',
-  untrackedNet: 'ALL',
-  saved: 'SAVINGS_DEPOSIT',
-  savingsUsed: 'SAVINGS_WITHDRAWAL',
-};
 
 export function LedgerWorkspace({
   data,
@@ -91,6 +83,8 @@ export function LedgerWorkspace({
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  useResetScrollOnChange(`${activeTab}:${ledgerPreset.key}:${transferPreset.key}`);
+
   const currentMonthSummary =
     data.monthlySummary[data.selectedMonth - 1] ?? data.monthlySummary[0];
   const viewedMonthPrefix = getMonthPrefix(data.selectedYear, data.selectedMonth);
@@ -116,6 +110,7 @@ export function LedgerWorkspace({
   }
 
   function handleSelectTab(tab: ActiveTab) {
+    scrollWindowToTop();
     if (tab === activeTab) return;
     setActiveTab(tab);
     const tabParam = tab !== 'overview' ? `&tab=${tab}` : '';
@@ -172,13 +167,7 @@ export function LedgerWorkspace({
           <DashboardView
             summary={currentMonthSummary}
             insights={data.insights}
-            onSelectFlow={(key) => {
-              if (key === 'transfersNet') {
-                handleSelectTab('transfers');
-              } else {
-                openLedgerWithPreset({ flow: FLOW_DRILLDOWN_MAP[key] });
-              }
-            }}
+            onSelectFlow={(key) => openLedgerWithPreset({ flow: CASH_FLOW_DRILLDOWN_MAP[key] })}
             onSelectGroup={(groupName) =>
               openLedgerWithPreset({ flow: 'EXPENSE', query: groupName })
             }
