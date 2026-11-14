@@ -6,7 +6,11 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TransferForm } from '@/components/transfers/TransferForm';
-import { TransfersView } from '@/components/transfers/TransfersView';
+import {
+  DEFAULT_TRANSFER_FILTERS,
+  TransfersView,
+  type TransferFilterState,
+} from '@/components/transfers/TransfersView';
 import { CurrencyProvider } from '@/components/ui/CurrencyContext';
 import type { AccountBalanceRow, TransferRow } from '@/types/ledger';
 
@@ -268,5 +272,80 @@ describe('Transfers UI', () => {
     assert.ok(screen.getByText(/Add at least two accounts/i));
     const submitBtn = screen.getByRole('button', { name: 'Transfer' }) as HTMLButtonElement;
     assert.equal(submitBtn.disabled, true);
+  });
+
+  it('retains filter resets to All accounts across tab unmounts instead of reverting to preset', () => {
+    const extraTransfers: TransferRow[] = [
+      ...sampleTransfers,
+      {
+        id: 'tr-bank-only',
+        transferDate: '2026-11-14',
+        fromAccountId: 'acc-bank',
+        fromAccountName: 'Bank',
+        toAccountId: 'acc-cash',
+        toAccountName: 'Cash',
+        amount: 2500,
+        feeAmount: 0,
+        description: 'ATM deposit',
+      },
+    ];
+
+    function TransferTabHarness() {
+      const [tab, setTab] = React.useState<'transfers' | 'accounts'>('transfers');
+      const [filters, setFilters] = React.useState<TransferFilterState>({
+        ...DEFAULT_TRANSFER_FILTERS,
+        accountId: 'acc-bank',
+      });
+      return (
+        <div>
+          <button type="button" onClick={() => setTab('accounts')}>
+            Accounts tab
+          </button>
+          <button type="button" onClick={() => setTab('transfers')}>
+            Transfers tab
+          </button>
+          {tab === 'transfers' ? (
+            <TransfersView
+              selectedYear={2026}
+              selectedMonth={11}
+              accounts={sampleAccounts}
+              transfers={extraTransfers}
+              filters={filters}
+              onFiltersChange={setFilters}
+              isPending={false}
+              onEditTransfer={() => {}}
+              onDeleteTransfer={() => {}}
+            />
+          ) : (
+            <div>Accounts placeholder</div>
+          )}
+        </div>
+      );
+    }
+
+    render(
+      <CurrencyProvider symbol="Tk">
+        <TransferTabHarness />
+      </CurrencyProvider>
+    );
+
+    // Initially filtered to Bank only
+    assert.ok(screen.getByText(/ATM deposit/));
+    assert.equal(screen.queryByText(/Cash out/), null);
+
+    // Reset filter to All accounts via Clear filters, then switch away and back
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    assert.ok(screen.getByText(/Cash out/));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accounts tab' }));
+    assert.equal(screen.queryByText(/ATM deposit/), null);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Transfers tab' }));
+    assert.ok(screen.getByText(/ATM deposit/));
+    assert.ok(screen.getByText(/Cash out/));
+    const accountCombobox = screen.getByRole('combobox', {
+      name: 'Filter by account',
+    }) as HTMLInputElement;
+    assert.equal(accountCombobox.value, 'All accounts');
   });
 });
