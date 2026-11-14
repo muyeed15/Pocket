@@ -1,9 +1,97 @@
 {
-  "id": "df73e26d-8264-4477-95a4-008035be67a9",
+  "id": "b86793cd-52fc-4a79-aa6b-eb51ab8a9c45",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency_code": {
+          "name": "currency_code",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'BDT'"
+        },
+        "currency_symbol": {
+          "name": "currency_symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Tk'"
+        },
+        "opening_cash_balance": {
+          "name": "opening_cash_balance",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.00'"
+        },
+        "opening_savings_balance": {
+          "name": "opening_savings_balance",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.00'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.account_transfers": {
       "name": "account_transfers",
       "schema": "",
@@ -439,181 +527,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.monthly_budget_items": {
-      "name": "monthly_budget_items",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "budget_month": {
-          "name": "budget_month",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "item_type": {
-          "name": "item_type",
-          "type": "budget_item_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "category_id": {
-          "name": "category_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "budget_group_id": {
-          "name": "budget_group_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "savings_fund_id": {
-          "name": "savings_fund_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "planned_amount": {
-          "name": "planned_amount",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0.00'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_budget_user_month": {
-          "name": "idx_budget_user_month",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "budget_month",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "monthly_budget_items_user_id_users_id_fk": {
-          "name": "monthly_budget_items_user_id_users_id_fk",
-          "tableFrom": "monthly_budget_items",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "monthly_budget_items_category_id_categories_id_fk": {
-          "name": "monthly_budget_items_category_id_categories_id_fk",
-          "tableFrom": "monthly_budget_items",
-          "tableTo": "categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "monthly_budget_items_budget_group_id_budget_groups_id_fk": {
-          "name": "monthly_budget_items_budget_group_id_budget_groups_id_fk",
-          "tableFrom": "monthly_budget_items",
-          "tableTo": "budget_groups",
-          "columnsFrom": [
-            "budget_group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "monthly_budget_items_savings_fund_id_savings_funds_id_fk": {
-          "name": "monthly_budget_items_savings_fund_id_savings_funds_id_fk",
-          "tableFrom": "monthly_budget_items",
-          "tableTo": "savings_funds",
-          "columnsFrom": [
-            "savings_fund_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "monthly_budget_items_unique_target": {
-          "name": "monthly_budget_items_unique_target",
-          "nullsNotDistinct": true,
-          "columns": [
-            "user_id",
-            "budget_month",
-            "item_type",
-            "category_id",
-            "budget_group_id",
-            "savings_fund_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "chk_planned_amount_non_neg": {
-          "name": "chk_planned_amount_non_neg",
-          "value": "\"monthly_budget_items\".\"planned_amount\" >= 0"
-        },
-        "chk_budget_target": {
-          "name": "chk_budget_target",
-          "value": "(\n        (\"monthly_budget_items\".\"item_type\" = 'INCOME' AND \"monthly_budget_items\".\"category_id\" IS NOT NULL AND \"monthly_budget_items\".\"budget_group_id\" IS NULL AND \"monthly_budget_items\".\"savings_fund_id\" IS NULL) OR\n        (\"monthly_budget_items\".\"item_type\" = 'SPENDING' AND \"monthly_budget_items\".\"budget_group_id\" IS NOT NULL AND \"monthly_budget_items\".\"category_id\" IS NULL AND \"monthly_budget_items\".\"savings_fund_id\" IS NULL) OR\n        (\"monthly_budget_items\".\"item_type\" = 'SAVINGS' AND \"monthly_budget_items\".\"savings_fund_id\" IS NOT NULL AND \"monthly_budget_items\".\"category_id\" IS NULL AND \"monthly_budget_items\".\"budget_group_id\" IS NULL)\n      )"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.savings_funds": {
       "name": "savings_funds",
       "schema": "",
@@ -929,8 +842,8 @@
       },
       "isRLSEnabled": false
     },
-    "public.users": {
-      "name": "users",
+    "public.monthly_budget_items": {
+      "name": "monthly_budget_items",
       "schema": "",
       "columns": {
         "id": {
@@ -940,41 +853,45 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "name": {
-          "name": "name",
-          "type": "text",
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "email": {
-          "name": "email",
-          "type": "text",
+        "budget_month": {
+          "name": "budget_month",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
-        "currency_code": {
-          "name": "currency_code",
-          "type": "char(3)",
+        "item_type": {
+          "name": "item_type",
+          "type": "budget_item_type",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'BDT'"
+          "notNull": true
         },
-        "currency_symbol": {
-          "name": "currency_symbol",
-          "type": "text",
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'Tk'"
+          "notNull": false
         },
-        "opening_cash_balance": {
-          "name": "opening_cash_balance",
-          "type": "numeric(14, 2)",
+        "budget_group_id": {
+          "name": "budget_group_id",
+          "type": "uuid",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'0.00'"
+          "notNull": false
         },
-        "opening_savings_balance": {
-          "name": "opening_savings_balance",
+        "savings_fund_id": {
+          "name": "savings_fund_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "planned_amount": {
+          "name": "planned_amount",
           "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": true,
@@ -995,20 +912,109 @@
           "default": "now()"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "idx_budget_user_month": {
+          "name": "idx_budget_user_month",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "budget_month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "monthly_budget_items_user_id_users_id_fk": {
+          "name": "monthly_budget_items_user_id_users_id_fk",
+          "tableFrom": "monthly_budget_items",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "monthly_budget_items_category_id_categories_id_fk": {
+          "name": "monthly_budget_items_category_id_categories_id_fk",
+          "tableFrom": "monthly_budget_items",
+          "tableTo": "categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "monthly_budget_items_budget_group_id_budget_groups_id_fk": {
+          "name": "monthly_budget_items_budget_group_id_budget_groups_id_fk",
+          "tableFrom": "monthly_budget_items",
+          "tableTo": "budget_groups",
+          "columnsFrom": [
+            "budget_group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "monthly_budget_items_savings_fund_id_savings_funds_id_fk": {
+          "name": "monthly_budget_items_savings_fund_id_savings_funds_id_fk",
+          "tableFrom": "monthly_budget_items",
+          "tableTo": "savings_funds",
+          "columnsFrom": [
+            "savings_fund_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "users_email_unique": {
-          "name": "users_email_unique",
-          "nullsNotDistinct": false,
+        "monthly_budget_items_unique_target": {
+          "name": "monthly_budget_items_unique_target",
+          "nullsNotDistinct": true,
           "columns": [
-            "email"
+            "user_id",
+            "budget_month",
+            "item_type",
+            "category_id",
+            "budget_group_id",
+            "savings_fund_id"
           ]
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chk_planned_amount_non_neg": {
+          "name": "chk_planned_amount_non_neg",
+          "value": "\"monthly_budget_items\".\"planned_amount\" >= 0"
+        },
+        "chk_budget_target": {
+          "name": "chk_budget_target",
+          "value": "(\n        (\"monthly_budget_items\".\"item_type\" = 'INCOME' AND \"monthly_budget_items\".\"category_id\" IS NOT NULL AND \"monthly_budget_items\".\"budget_group_id\" IS NULL AND \"monthly_budget_items\".\"savings_fund_id\" IS NULL) OR\n        (\"monthly_budget_items\".\"item_type\" = 'SPENDING' AND \"monthly_budget_items\".\"budget_group_id\" IS NOT NULL AND \"monthly_budget_items\".\"category_id\" IS NULL AND \"monthly_budget_items\".\"savings_fund_id\" IS NULL) OR\n        (\"monthly_budget_items\".\"item_type\" = 'SAVINGS' AND \"monthly_budget_items\".\"savings_fund_id\" IS NOT NULL AND \"monthly_budget_items\".\"category_id\" IS NULL AND \"monthly_budget_items\".\"budget_group_id\" IS NULL)\n      )"
+        }
+      },
       "isRLSEnabled": false
     }
   },
