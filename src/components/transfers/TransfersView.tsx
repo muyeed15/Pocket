@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { IoSwapHorizontalOutline } from 'react-icons/io5';
 import { ACCOUNT_TYPE_LABELS, MONTH_NAMES } from '@/lib/constants';
 import {
@@ -10,6 +10,7 @@ import {
   round2,
 } from '@/lib/format';
 import { filterTransfers } from '@/lib/summary';
+import { useControlledFilters } from '@/hooks/useControlledFilters';
 import { Button } from '@/components/ui/Button';
 import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { useCurrencySymbol } from '@/components/ui/CurrencyContext';
@@ -19,7 +20,21 @@ import { EmptyState } from '@/components/ui/Section';
 import type { AccountBalanceRow, TransferRow } from '@/types/ledger';
 import { TransferRowItem } from './TransferRowItem';
 
-type Scope = 'month' | 'all';
+export type TransferScope = 'month' | 'all';
+
+export interface TransferFilterState {
+  scope: TransferScope;
+  accountId: string;
+  chargesOnly: boolean;
+  query: string;
+}
+
+export const DEFAULT_TRANSFER_FILTERS: TransferFilterState = {
+  scope: 'month',
+  accountId: 'ALL',
+  chargesOnly: false,
+  query: '',
+};
 
 interface TransfersViewProps {
   selectedYear: number;
@@ -27,6 +42,8 @@ interface TransfersViewProps {
   accounts: AccountBalanceRow[];
   transfers: TransferRow[];
   initialAccountFilter?: string;
+  filters?: TransferFilterState;
+  onFiltersChange?: (next: TransferFilterState) => void;
   isPending: boolean;
   onAddTransfer?: () => void;
   onEditTransfer: (tr: TransferRow) => void;
@@ -39,16 +56,25 @@ export function TransfersView({
   accounts,
   transfers,
   initialAccountFilter = 'ALL',
+  filters,
+  onFiltersChange,
   isPending,
   onAddTransfer,
   onEditTransfer,
   onDeleteTransfer,
 }: TransfersViewProps) {
   const symbol = useCurrencySymbol();
-  const [scope, setScope] = useState<Scope>('month');
-  const [accountFilter, setAccountFilter] = useState<string>(initialAccountFilter);
-  const [chargesOnly, setChargesOnly] = useState(false);
-  const [query, setQuery] = useState('');
+  const [activeFilters, updateFilters] = useControlledFilters(
+    filters,
+    {
+      scope: 'month',
+      accountId: initialAccountFilter,
+      chargesOnly: false,
+      query: '',
+    },
+    onFiltersChange
+  );
+  const { scope, accountId: accountFilter, chargesOnly, query } = activeFilters;
 
   const monthPrefix = getMonthPrefix(selectedYear, selectedMonth);
   const monthLabel = `${MONTH_NAMES[selectedMonth - 1] ?? ''} ${selectedYear}`;
@@ -146,11 +172,8 @@ export function TransfersView({
 
   const isFiltering =
     Boolean(query.trim()) || accountFilter !== 'ALL' || chargesOnly;
-  const clearFilters = () => {
-    setQuery('');
-    setAccountFilter('ALL');
-    setChargesOnly(false);
-  };
+  const clearFilters = () =>
+    updateFilters({ query: '', accountId: 'ALL', chargesOnly: false });
   const emptyMessage = isFiltering
     ? `No matching transfers${scope === 'month' ? ` in ${monthLabel}` : ''}`
     : scope === 'month'
@@ -161,7 +184,7 @@ export function TransfersView({
     isFiltering || scope === 'month' ? (
       <div className="flex flex-wrap items-center justify-center gap-3">
         {scope === 'month' && (
-          <Button variant="ghost" onClick={() => setScope('all')}>
+          <Button variant="ghost" onClick={() => updateFilters({ scope: 'all' })}>
             Search all time
           </Button>
         )}
@@ -246,7 +269,7 @@ export function TransfersView({
         <div className="flex flex-col gap-3 border-b border-neutral-200 pb-3 lg:flex-row lg:items-center lg:gap-8 lg:pb-4">
           <SearchField
             value={query}
-            onChange={setQuery}
+            onChange={(q) => updateFilters({ query: q })}
             label="Search transfers"
             placeholder="Search"
           />
@@ -257,7 +280,7 @@ export function TransfersView({
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setScope(value)}
+                  onClick={() => updateFilters({ scope: value })}
                   className={
                     scope === value
                       ? 'text-black'
@@ -270,7 +293,7 @@ export function TransfersView({
               <button
                 type="button"
                 aria-pressed={chargesOnly}
-                onClick={() => setChargesOnly((prev) => !prev)}
+                onClick={() => updateFilters({ chargesOnly: !chargesOnly })}
                 className={
                   chargesOnly
                     ? 'text-black'
@@ -285,7 +308,7 @@ export function TransfersView({
               ariaLabel="Filter by account"
               options={accountOptions}
               value={accountFilter}
-              onChange={(val) => setAccountFilter(val || 'ALL')}
+              onChange={(val) => updateFilters({ accountId: val || 'ALL' })}
               allowClear={accountFilter !== 'ALL'}
               placeholder="All accounts"
               className="w-full sm:w-44"
