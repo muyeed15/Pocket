@@ -17,6 +17,7 @@ import { SearchField } from '@/components/ui/Field';
 import { Sheet } from '@/components/ui/Sheet';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { Toast } from '@/components/ui/Toast';
+import { useResetScrollOnChange } from '@/hooks/useResetScrollOnChange';
 import { TONES } from '@/lib/constants';
 
 afterEach(cleanup);
@@ -595,5 +596,39 @@ describe('UI primitives', () => {
       Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' })
     );
     assert.equal(screen.queryByRole('tooltip'), null);
+  });
+
+  it('resets viewport scroll to top on view or drill-down transitions without scrolling on initial mount', () => {
+    const calls: unknown[] = [];
+    const originalScrollTo = window.scrollTo;
+    Object.defineProperty(window, 'scrollTo', {
+      configurable: true,
+      value: (opts: unknown) => {
+        calls.push(opts);
+      },
+    });
+
+    function Harness({ viewKey }: { viewKey: string }) {
+      useResetScrollOnChange(viewKey);
+      return <div>{viewKey}</div>;
+    }
+
+    try {
+      const { rerender } = render(<Harness viewKey="overview:0:0" />);
+      assert.equal(calls.length, 0);
+
+      rerender(<Harness viewKey="transactions:1:0" />);
+      assert.equal(calls.length, 1);
+      assert.deepEqual(calls[0], { top: 0, left: 0, behavior: 'auto' });
+
+      rerender(<Harness viewKey="transactions:2:0" />);
+      assert.equal(calls.length, 2);
+      assert.deepEqual(calls[1], { top: 0, left: 0, behavior: 'auto' });
+    } finally {
+      Object.defineProperty(window, 'scrollTo', {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
   });
 });
