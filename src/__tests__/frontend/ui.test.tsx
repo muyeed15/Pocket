@@ -631,4 +631,51 @@ describe('UI primitives', () => {
       });
     }
   });
+
+  it('keeps Combobox listbox closed on Clear selection regardless of focus and toggles via click', () => {
+    function ControlledCombobox() {
+      const [value, setValue] = React.useState('a');
+      return (
+        <Combobox
+          ariaLabel="Pick item"
+          value={value}
+          onChange={setValue}
+          allowClear
+          placeholder="All items"
+          options={[
+            { value: 'a', label: 'Alpha' },
+            { value: 'b', label: 'Beta' },
+          ]}
+        />
+      );
+    }
+
+    render(<ControlledCombobox />);
+    const input = screen.getByRole('combobox', { name: 'Pick item' }) as HTMLInputElement;
+    assert.equal(input.value, 'Alpha');
+    assert.equal(input.getAttribute('aria-expanded'), 'false');
+
+    // Clearing while blurred must not pop the dropdown open via onFocus.
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Clear selection' }));
+    assert.equal(input.value, '');
+    assert.equal(input.getAttribute('aria-expanded'), 'false');
+    assert.equal(screen.queryByRole('listbox'), null);
+
+    // Toggle options supports non-pointer synthetic click as well as mousedown.
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle options' }));
+    assert.equal(input.getAttribute('aria-expanded'), 'true');
+    assert.notEqual(screen.queryByRole('listbox'), null);
+
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Beta' }));
+    assert.equal(input.value, 'Beta');
+    assert.equal(input.getAttribute('aria-expanded'), 'false');
+
+    // Open dropdown, then clear via click: closes cleanly and clears selection.
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle options' }));
+    assert.equal(input.getAttribute('aria-expanded'), 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    assert.equal(input.value, '');
+    assert.equal(input.getAttribute('aria-expanded'), 'false');
+    assert.equal(screen.queryByRole('listbox'), null);
+  });
 });
