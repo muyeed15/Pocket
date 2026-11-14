@@ -34,13 +34,19 @@ import { TopHeader } from './layout/TopHeader';
 import { DashboardView } from './dashboard/DashboardView';
 import {
   CASH_FLOW_DRILLDOWN_MAP,
+  DEFAULT_LEDGER_FILTERS,
   TransactionsView,
   type FlowFilter,
+  type LedgerFilterState,
 } from './transactions/TransactionsView';
 import { TransactionForm } from './transactions/TransactionForm';
 import { BudgetView } from './budget/BudgetView';
 import { AccountsView } from './accounts/AccountsView';
-import { TransfersView } from './transfers/TransfersView';
+import {
+  DEFAULT_TRANSFER_FILTERS,
+  TransfersView,
+  type TransferFilterState,
+} from './transfers/TransfersView';
 import { TransferForm } from './transfers/TransferForm';
 import { YearlySummaryView } from './summary/YearlySummaryView';
 
@@ -60,16 +66,11 @@ export function LedgerWorkspace({
   const [editingTransaction, setEditingTransaction] =
     useState<LedgerTransactionRow | null>(null);
   const [editingTransfer, setEditingTransfer] = useState<TransferRow | null>(null);
-  const [ledgerPreset, setLedgerPreset] = useState<{
-    key: number;
-    flow: FlowFilter;
-    query: string;
-    accountId: string;
-  }>({ key: 0, flow: 'ALL', query: '', accountId: 'ALL' });
-  const [transferPreset, setTransferPreset] = useState<{
-    key: number;
-    accountId: string;
-  }>({ key: 0, accountId: 'ALL' });
+  const [ledgerFilters, setLedgerFilters] =
+    useState<LedgerFilterState>(DEFAULT_LEDGER_FILTERS);
+  const [transferFilters, setTransferFilters] =
+    useState<TransferFilterState>(DEFAULT_TRANSFER_FILTERS);
+  const [scrollResetSeq, setScrollResetSeq] = useState(0);
 
   useEffect(() => {
     function handlePopState() {
@@ -83,7 +84,7 @@ export function LedgerWorkspace({
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  useResetScrollOnChange(`${activeTab}:${ledgerPreset.key}:${transferPreset.key}`);
+  useResetScrollOnChange(`${activeTab}:${scrollResetSeq}`);
 
   const currentMonthSummary =
     data.monthlySummary[data.selectedMonth - 1] ?? data.monthlySummary[0];
@@ -126,18 +127,32 @@ export function LedgerWorkspace({
     query?: string;
     accountId?: string;
   }) {
-    setLedgerPreset((prev) => ({
-      key: prev.key + 1,
+    setLedgerFilters({
+      scope: 'month',
       flow: next.flow ?? 'ALL',
       query: next.query ?? '',
       accountId: next.accountId ?? 'ALL',
-    }));
+    });
+    setScrollResetSeq((n) => n + 1);
     handleSelectTab('transactions');
   }
 
   function openTransfersForAccount(accountId: string) {
-    setTransferPreset((prev) => ({ key: prev.key + 1, accountId }));
+    setTransferFilters({
+      scope: 'month',
+      accountId,
+      chargesOnly: false,
+      query: '',
+    });
+    setScrollResetSeq((n) => n + 1);
     handleSelectTab('transfers');
+  }
+
+  function closeEntrySheet() {
+    setEntryOpen(false);
+    setEditingTransaction(null);
+    setEditingTransfer(null);
+    setEntryMode('entry');
   }
 
   return (
@@ -176,15 +191,13 @@ export function LedgerWorkspace({
 
         {activeTab === 'transactions' && (
           <TransactionsView
-            key={ledgerPreset.key}
             selectedYear={data.selectedYear}
             selectedMonth={data.selectedMonth}
             transactions={data.transactions}
             transfers={data.transfers}
             accounts={data.accounts}
-            initialFlow={ledgerPreset.flow}
-            initialQuery={ledgerPreset.query}
-            initialAccountFilter={ledgerPreset.accountId}
+            filters={ledgerFilters}
+            onFiltersChange={setLedgerFilters}
             isPending={isPending}
             onAddEntry={() => {
               setEntryMode('entry');
@@ -252,12 +265,12 @@ export function LedgerWorkspace({
 
         {activeTab === 'transfers' && (
           <TransfersView
-            key={transferPreset.key}
             selectedYear={data.selectedYear}
             selectedMonth={data.selectedMonth}
             accounts={data.accounts}
             transfers={data.transfers}
-            initialAccountFilter={transferPreset.accountId}
+            filters={transferFilters}
+            onFiltersChange={setTransferFilters}
             isPending={isPending}
             onAddTransfer={() => {
               setEntryMode('transfer');
@@ -290,12 +303,7 @@ export function LedgerWorkspace({
                   : 'New entry'
           }
           open={sheetOpen}
-          onClose={() => {
-            setEntryOpen(false);
-            setEditingTransaction(null);
-            setEditingTransfer(null);
-            setEntryMode('entry');
-          }}
+          onClose={closeEntrySheet}
         >
           {!editingTransaction && !editingTransfer && (
             <div
@@ -342,7 +350,7 @@ export function LedgerWorkspace({
                         'Transfer updated',
                         formData.get('transferDate')
                       ),
-                      () => setEditingTransfer(null)
+                      closeEntrySheet
                     )
                   : runMutation(
                       () => createTransferAction(formData),
@@ -350,7 +358,7 @@ export function LedgerWorkspace({
                         'Transfer recorded',
                         formData.get('transferDate')
                       ),
-                      () => setEntryOpen(false)
+                      closeEntrySheet
                     )
               }
             />
@@ -371,7 +379,7 @@ export function LedgerWorkspace({
                         'Entry updated',
                         formData.get('transactionDate')
                       ),
-                      () => setEditingTransaction(null)
+                      closeEntrySheet
                     )
                   : runMutation(
                       () => createTransactionAction(formData),
@@ -379,7 +387,7 @@ export function LedgerWorkspace({
                         'Entry saved',
                         formData.get('transactionDate')
                       ),
-                      () => setEntryOpen(false)
+                      closeEntrySheet
                     )
               }
             />
