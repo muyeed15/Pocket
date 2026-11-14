@@ -48,6 +48,7 @@ export function Combobox({
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxRef = useRef<HTMLUListElement>(null);
   const justFocusedRef = useRef(false);
+  const skipFocusOpenRef = useRef(false);
 
   const selectedOption = useMemo(
     () => options.find((o) => o.value === value) ?? null,
@@ -191,6 +192,30 @@ export function Combobox({
     }
   }
 
+  function clearSelection() {
+    onChange('');
+    setQuery(null);
+    setOpen(false);
+    setActiveIndex(-1);
+    if (document.activeElement !== inputRef.current) {
+      skipFocusOpenRef.current = true;
+      inputRef.current?.focus();
+      skipFocusOpenRef.current = false;
+    }
+  }
+
+  function toggleOptions() {
+    if (disabled) return;
+    if (open) {
+      setOpen(false);
+      setQuery(null);
+    } else {
+      inputRef.current?.focus();
+      setOpen(true);
+      setActiveIndex(getInitialActiveIndex());
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -218,6 +243,10 @@ export function Combobox({
           value={displayValue}
           placeholder={placeholder}
           onFocus={(e) => {
+            if (skipFocusOpenRef.current) {
+              skipFocusOpenRef.current = false;
+              return;
+            }
             setOpen(true);
             setActiveIndex(getInitialActiveIndex());
             if (selectedOption) {
@@ -256,9 +285,12 @@ export function Combobox({
             aria-label="Clear selection"
             onMouseDown={(e) => {
               e.preventDefault();
-              onChange('');
-              setQuery(null);
-              inputRef.current?.focus();
+              clearSelection();
+            }}
+            onClick={(e) => {
+              if (e.detail === 0) {
+                clearSelection();
+              }
             }}
             className="absolute right-6 inline-flex size-6 items-center justify-center text-neutral-400 transition-colors hover:text-black"
           >
@@ -272,13 +304,11 @@ export function Combobox({
           disabled={disabled}
           onMouseDown={(e) => {
             e.preventDefault();
-            if (open) {
-              setOpen(false);
-              setQuery(null);
-            } else {
-              inputRef.current?.focus();
-              setOpen(true);
-              setActiveIndex(getInitialActiveIndex());
+            toggleOptions();
+          }}
+          onClick={(e) => {
+            if (e.detail === 0) {
+              toggleOptions();
             }
           }}
           className="absolute right-0 inline-flex size-6 items-center justify-center text-neutral-400 transition-colors hover:text-black"
