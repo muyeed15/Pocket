@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { IoAdd } from 'react-icons/io5';
 import { ACCOUNT_TYPE_LABELS, FLOW_TYPE_LABELS, MONTH_NAMES } from '@/lib/constants';
 import { formatTk, getMonthPrefix, round2 } from '@/lib/format';
 import { filterTransfers, isServiceChargeTransaction } from '@/lib/summary';
+import { useControlledFilters } from '@/hooks/useControlledFilters';
 import { Button } from '@/components/ui/Button';
 import { Combobox, type ComboboxOption } from '@/components/ui/Combobox';
 import { useCurrencySymbol } from '@/components/ui/CurrencyContext';
@@ -19,9 +20,23 @@ import type {
 import type { CashFlowKey } from '../dashboard/MonthFlowList';
 import { TransactionList } from './TransactionList';
 
-type Scope = 'month' | 'all';
+export type LedgerScope = 'month' | 'all';
 type FlowFilterGroup = 'TRANSFERS' | 'ADJUSTMENTS';
 export type FlowFilter = FlowType | 'ALL' | 'SERVICE_CHARGES' | FlowFilterGroup;
+
+export interface LedgerFilterState {
+  scope: LedgerScope;
+  flow: FlowFilter;
+  accountId: string;
+  query: string;
+}
+
+export const DEFAULT_LEDGER_FILTERS: LedgerFilterState = {
+  scope: 'month',
+  flow: 'ALL',
+  accountId: 'ALL',
+  query: '',
+};
 
 const FLOW_FILTER_GROUPS: Record<FlowFilterGroup, readonly FlowType[]> = {
   TRANSFERS: ['TRANSFER_IN', 'TRANSFER_OUT'],
@@ -50,6 +65,8 @@ interface TransactionsViewProps {
   initialFlow?: FlowFilter;
   initialQuery?: string;
   initialAccountFilter?: string;
+  filters?: LedgerFilterState;
+  onFiltersChange?: (next: LedgerFilterState) => void;
   isPending: boolean;
   onAddEntry?: () => void;
   onAddTransfer?: () => void;
@@ -68,6 +85,8 @@ export function TransactionsView({
   initialFlow = 'ALL',
   initialQuery = '',
   initialAccountFilter = 'ALL',
+  filters,
+  onFiltersChange,
   isPending,
   onAddEntry,
   onAddTransfer,
@@ -77,10 +96,17 @@ export function TransactionsView({
   onDeleteTransfer,
 }: TransactionsViewProps) {
   const symbol = useCurrencySymbol();
-  const [scope, setScope] = useState<Scope>('month');
-  const [flow, setFlow] = useState<FlowFilter>(initialFlow);
-  const [accountFilter, setAccountFilter] = useState<string>(initialAccountFilter);
-  const [query, setQuery] = useState(initialQuery);
+  const [activeFilters, updateFilters] = useControlledFilters(
+    filters,
+    {
+      scope: 'month',
+      flow: initialFlow,
+      accountId: initialAccountFilter,
+      query: initialQuery,
+    },
+    onFiltersChange
+  );
+  const { scope, flow, accountId: accountFilter, query } = activeFilters;
 
   const monthPrefix = getMonthPrefix(selectedYear, selectedMonth);
 
@@ -194,9 +220,7 @@ export function TransactionsView({
           : 'No entries recorded yet';
 
   function clearFilters() {
-    setQuery('');
-    setFlow('ALL');
-    setAccountFilter('ALL');
+    updateFilters({ query: '', flow: 'ALL', accountId: 'ALL' });
   }
 
   const hasAnyHistory =
@@ -204,7 +228,7 @@ export function TransactionsView({
   const emptyAction = isFiltering ? (
     <div className="flex flex-wrap items-center justify-center gap-3">
       {scope === 'month' && (
-        <Button variant="ghost" onClick={() => setScope('all')}>
+        <Button variant="ghost" onClick={() => updateFilters({ scope: 'all' })}>
           Search all time
         </Button>
       )}
@@ -219,7 +243,7 @@ export function TransactionsView({
     </div>
   ) : scope === 'month' && hasAnyHistory ? (
     <div className="flex flex-wrap items-center justify-center gap-3">
-      <Button variant="ghost" onClick={() => setScope('all')}>
+      <Button variant="ghost" onClick={() => updateFilters({ scope: 'all' })}>
         Search all time
       </Button>
       {onAddEntry && (
@@ -269,7 +293,7 @@ export function TransactionsView({
         <div className="flex flex-col gap-3 border-b border-neutral-200 pb-3 lg:flex-row lg:items-center lg:gap-8 lg:pb-4">
           <SearchField
             value={query}
-            onChange={setQuery}
+            onChange={(q) => updateFilters({ query: q })}
             label="Search transactions"
             placeholder="Search"
           />
@@ -280,7 +304,7 @@ export function TransactionsView({
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setScope(value)}
+                  onClick={() => updateFilters({ scope: value })}
                   className={scope === value ? 'text-black' : 'text-neutral-400 hover:text-black'}
                 >
                   {value === 'month' ? 'This month' : 'All time'}
@@ -293,7 +317,7 @@ export function TransactionsView({
                 ariaLabel="Filter by type"
                 options={flowOptions}
                 value={flow}
-                onChange={(val) => setFlow((val || 'ALL') as FlowFilter)}
+                onChange={(val) => updateFilters({ flow: (val || 'ALL') as FlowFilter })}
                 allowClear={flow !== 'ALL'}
                 placeholder="All types"
                 className="min-w-0 flex-1 sm:w-44 sm:flex-none"
@@ -305,7 +329,7 @@ export function TransactionsView({
                   ariaLabel="Filter by account"
                   options={accountOptions}
                   value={accountFilter}
-                  onChange={(val) => setAccountFilter(val || 'ALL')}
+                  onChange={(val) => updateFilters({ accountId: val || 'ALL' })}
                   allowClear={accountFilter !== 'ALL'}
                   placeholder="All accounts"
                   className="min-w-0 flex-1 sm:w-44 sm:flex-none"
